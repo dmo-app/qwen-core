@@ -438,6 +438,9 @@ bool EngineSession::connect() {
   {
     std::lock_guard<std::mutex> g(mutex_);
     snap_ = SessionSnapshot{};
+    // The count goes on across a restart: one that starts at 0 again looks like a plugin's own change to the
+    // window, which compares with the last count it saw, and marks the song modified (audit 2026-11-17, item 8).
+    snap_.pluginEdits = pluginEditsTotal_;
     snap_.status = EngineStatus::Starting;
     snap_.message = "Starting the engine...";
     snap_.documentRevision = wantedRevision_;
@@ -582,7 +585,7 @@ void EngineSession::onEvent(const json& event) {
     return;
   }
   if (kind == "ended") { if (transportPending_ == 0) snap_.playing = false; return; }
-  if (kind == "pluginsChanged") { ++snap_.pluginEdits; return; }
+  if (kind == "pluginsChanged") { snap_.pluginEdits = ++pluginEditsTotal_; return; }
   if (kind == "job") {
     // Only the current job's events: an older job to the same file must not be taken for it.
     if (snap_.exportJob.jobId != 0 && event.value("jobId", (uint64_t)0) == snap_.exportJob.jobId) readJob(snap_.exportJob, event);

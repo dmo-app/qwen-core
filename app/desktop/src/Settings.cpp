@@ -475,6 +475,9 @@ class RolesPage final : public juce::Component {
       }
       r->plugin.setSelectedId(selected, juce::dontSendNotification);
       r->params.setEnabled(b != nullptr && !r->busy);
+      // While its parameters are being read the row cannot be given another plugin: that is how one plugin's
+      // list came to be saved for another (audit 2026-11-17, item 18). The read always ends with a refresh().
+      r->plugin.setEnabled(!r->busy);
       r->summary = summary(r->role);
       r->repaint();
     }
@@ -499,6 +502,9 @@ class RolesPage final : public juce::Component {
   struct Row final : public juce::Component {
     std::string role;
     bool instrument = false, busy = false;
+    // Which read of the parameters this row is waiting for (audit 2026-11-17, item 18): a reply is only taken
+    // when it is the one still asked for - the plugin may have been changed while it was being read.
+    uint64_t generation = 0;
     juce::Label name;
     juce::ComboBox plugin;
     juce::TextButton params;
@@ -544,6 +550,7 @@ class RolesPage final : public juce::Component {
     const core::doc::RoleBinding* b = map_.find(row.role);
     if (!b) return;
     row.busy = true;
+    const uint64_t gen = ++row.generation;  // this read, and no other, may answer for the row now
     row.params.setEnabled(false);
     notice_.setText(juce::String::fromUTF8("Reading the parameters of ") + juce::String::fromUTF8(b->plugin.value("name", std::string()).c_str()) +
                         juce::String::fromUTF8("\xe2\x80\xa6"), juce::dontSendNotification);
@@ -551,13 +558,16 @@ class RolesPage final : public juce::Component {
     const json plugin = b->plugin;
     const std::string role = row.role;
     const juce::File engine = host_.engine();
-    juce::Thread::launch([safe, plugin, role, engine, then] {
+    juce::Thread::launch([safe, plugin, role, gen, engine, then] {
       juce::String problem;
       const json list = PluginCatalog::paramsOf(engine, plugin, &problem);
-      juce::MessageManager::callAsync([safe, role, list, problem, then] {
+      juce::MessageManager::callAsync([safe, role, gen, list, problem, then] {
         if (safe == nullptr) return;
         for (auto& r : safe->rows_)
           if (r->role == role) {
+            // A reply of an older read (the row was given another plugin, or its role cleared, while this one
+            // was on its way): it belongs to a plugin that is not there any more, so it is dropped whole.
+            if (r->generation != gen) continue;
             r->busy = false;
             r->paramList = list;
             safe->notice_.setText(list.is_array() ? juce::String() : "Could not read its parameters: " + problem, juce::dontSendNotification);
@@ -573,12 +583,15 @@ class RolesPage final : public juce::Component {
     if (id == 999) return;
     if (id <= 1 || id - 2 >= (int)row.choices.size()) {
       map_.roles.erase(row.role);
+      ++row.generation;  // a read on its way belongs to the plugin that is gone: it may not answer for this row
+      row.busy = false;
       row.paramList = json();
       store();
       refresh();
       return;
     }
     map_.roles[row.role] = core::doc::RoleBinding{row.choices[(size_t)id - 2], {}, {}};
+    ++row.generation;  // same: the read asked for below is the only one this row answers to now
     row.paramList = json();
     store();
     refresh();

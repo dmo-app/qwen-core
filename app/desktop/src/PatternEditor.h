@@ -29,6 +29,9 @@ public:
     virtual double playheadTick() const = 0;
     // Moves the song's position (the start line): the piano roll's ruler, clicked or dragged.
     virtual void movePlayhead(int64_t /*songTick*/) {}
+    // What a plugin holds in the engine right now goes back into the document, before a change that would lose
+    // it (the same call the track's and the master's menus make before Remove). Panels without plugins: nothing.
+    virtual void capturePluginStates() {}
     // The tracks a plugin acts on (Diogo, 2026-11-05: "every plugin applies to the selected tracks at once, then
     // each track is touched alone"): the track shown first, then the others Ctrl/Shift-clicked, in song order.
     virtual std::vector<std::string> selectedTracks() const = 0;

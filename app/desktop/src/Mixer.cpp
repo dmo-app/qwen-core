@@ -298,11 +298,53 @@ public:
   }
 
   void mouseUp(const juce::MouseEvent& e) override {
+    const auto inserts = insertsArea();
+    if (e.y >= inserts.getBottom() + 4) return;
     // The name or the inserts choose the strip: its chain shows at the right.
-    if (e.y < insertsArea().getBottom() + 4 && owner_.onSelect) owner_.onSelect(id_);
+    if (owner_.onSelect) owner_.onSelect(id_);
+    // A right-click on an insert: the On and the Remove the track's and the master's menus already give for
+    // every chain entry, so an effect is not stuck when the mixer is the page you are on (audit 2026-11-17, item 15).
+    if (e.mods.isRightButtonDown() && e.y >= inserts.getY()) showInsertMenu();
   }
 
 private:
+  void showInsertMenu() {
+    const auto& chain = doc::effectChain(owner_.host_.currentDocument(), id_);  // "" = the master's chain
+    const int rows = std::min(insertRows(), (int)effects_.size());  // only the inserts this strip shows
+    std::vector<std::string> ids;  // what each row of the menu stands for: found again by id when it is answered
+    juce::PopupMenu menu;
+    for (int i = 0; i < (int)chain.size() && i < rows; ++i) {
+      ids.push_back(chain[(size_t)i].value("id", std::string()));
+      juce::PopupMenu one;
+      one.addItem(juce::PopupMenu::Item(u8("On")).setID(100 + i).setTicked(!doc::effectBypassed(chain[(size_t)i])));
+      one.addItem(juce::PopupMenu::Item(u8("Remove")).setID(200 + i));
+      menu.addSubMenu(effects_[(size_t)i].first, one);
+    }
+    if (ids.empty()) return;
+    juce::Component::SafePointer<Strip> self(this);
+    const juce::String what = master() ? juce::String("Master: ") : juce::String();
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [self, what, ids](int chosen) {
+      if (!self || chosen == 0) return;
+      const int row = chosen % 100;
+      if (row < 0 || row >= (int)ids.size()) return;
+      // The chain may have changed while the menu was up: the effect is looked for by its id, and a chain that
+      // no longer has it is left alone.
+      const auto& list = doc::effectChain(self->owner_.host_.currentDocument(), self->id_);
+      int at = -1;
+      for (int k = 0; k < (int)list.size(); ++k)
+        if (list[(size_t)k].value("id", std::string()) == ids[(size_t)row]) { at = k; break; }
+      if (at < 0) return;
+      if (chosen < 200) {
+        self->edit([self, at](doc::Document& d) {
+          doc::setEffectBypass(d, self->id_, at, !doc::effectBypassed(doc::effectChain(d, self->id_)[(size_t)at]));
+        }, what + u8("Effect on/off"));
+      } else {
+        self->owner_.host_.capturePluginStates();  // Undo brings the plugin back as it sounded, not as last saved
+        self->edit([self, at](doc::Document& d) { doc::removeEffect(d, self->id_, at); }, what + u8("Remove effect"));
+      }
+    });
+  }
+
   juce::Rectangle<int> insertsArea() const { return getLocalBounds().reduced(6, 5).withTrimmedTop(kHeader).withHeight(kInsertRow * insertRows()); }
   // A tall strip shows four inserts, shorter ones three or two, the shortest the first and "+N more".
   int insertRows() const { return getHeight() >= 380 ? kInsertRows : getHeight() >= 310 ? 3 : getHeight() >= 240 ? 2 : 1; }

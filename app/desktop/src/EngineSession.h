@@ -191,6 +191,7 @@ private:
   double listenDb_ = -10;   // setListenLevel; sent with every engine.start
   std::string watchOwner_, watchEffect_;  // watchEffect; sent again after a restart
   double lastTick_ = 0;     // last position seen, kept across engine restarts
+  uint64_t pluginEditsTotal_ = 0;  // pluginsChanged, kept across restarts too: the count the UI compares with
   SessionSnapshot snap_;
   int transportPending_ = 0;     // Play/Stop/Home queued and not yet taken by the engine
   bool transportIntent_ = false;  // playing, as the last of them asked

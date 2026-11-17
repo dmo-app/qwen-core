@@ -110,6 +110,7 @@ private:
   void finishGesture() override { endGesture(); }
   double playheadTick() const override { return playTick_; }
   void movePlayhead(int64_t songTick) override { moveShownPosition(songTick); }
+  void capturePluginStates() override { fetchPluginStates(); }  // the mixer's Remove asks like the menus do
   void selectTrack(const std::string& trackId);
   // Several tracks at once (a rule for every plugin, Diogo 2026-11-05): a plain click on a track header selects that
   // track alone; Ctrl+click adds or takes away one more; Shift+click adds every track between the shown one and it.
@@ -429,6 +430,9 @@ private:
   std::string failedSeen_;  // the failed units last shown (timerCallback)
   bool unsaved() const { return history_.modified() || recovered_ || pluginsDirty_; }
   bool pluginsDirty_ = false;  // a plugin's own window changed it since the last save
+  // Another song is on screen (open, new, recovered): nothing of the one before may follow it - not the
+  // plugins' unsaved state, not this session's autosave (audit 2026-11-17, items 7 and 8).
+  void documentLoaded();
   // Autosave (M6): every minute while there are unsaved changes, a copy goes to the autosave folder (never
   // over the song); saved, or closed cleanly, it is removed. One left by a crash is offered on the next start.
   void autosaveTick();

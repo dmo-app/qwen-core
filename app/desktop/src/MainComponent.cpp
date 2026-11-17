@@ -3911,6 +3911,7 @@ void MainComponent::open() {
         session_->newSong(); session_->releasePlugins();
         missing_.clear();
         session_->setAssetRoot(projectDir(), false);
+        documentLoaded();
         documentChanged(true);
         notice_ = r.imported ? u8("Imported from ") + f.getFileName() + u8(": save it under a new name (the original is not changed).")
                              : juce::String();
@@ -3944,6 +3945,7 @@ void MainComponent::newFromDocument(doc::Document fresh, std::function<void()> t
     missing_.clear();
     session_->home();
     session_->setAssetRoot({}, false);
+    documentLoaded();
     documentChanged(true);
     if (then) then();
   });
@@ -6437,6 +6439,20 @@ void MainComponent::removeOwnAutosave() {
   autosave_.removed();
 }
 
+// A new song is on screen: the two things that belonged to the one before go with it.
+// pluginsDirty_ said "a plugin's own window changed the sound since the last save" - of the OLD song: opened or
+// made new, the copy on disk cannot be behind, so the song would stay shown modified and be autosaved without
+// an edit (audit 2026-11-17, item 8). And the autosave of this session is a copy of the old song: "Don't save"
+// used to leave it there until the next check, up to a minute, and a crash in between offers the discarded
+// song back (item 7). lastAutosaveCheck_ = 0 looks again on the next tick, which also catches a copy that was
+// still being written when the song changed.
+void MainComponent::documentLoaded() {
+  pluginsDirty_ = false;
+  pluginEditsSeen_ = session_->snapshot().pluginEdits;
+  removeOwnAutosave();
+  lastAutosaveCheck_ = 0;
+}
+
 // At start: a song autosaved by a session that is not running any more (Core or the PC stopped without
 // closing) is offered back, the newest first. Recover opens it with unsaved changes; Discard deletes it;
 // Later keeps it for the next start.
@@ -6486,6 +6502,7 @@ void MainComponent::recoverAutosave(const doc::AutosaveInfo& a, const doc::Docum
   session_->newSong(); session_->releasePlugins();
   missing_.clear();
   session_->setAssetRoot(projectDir(), false);
+  documentLoaded();
   documentChanged(true);
   checkMissingAssets();
   doc::removeAutosave(a.file);  // this session autosaves it again from now on
