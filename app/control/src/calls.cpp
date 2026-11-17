@@ -492,8 +492,13 @@ Proposal validateProposal(const json& raw, const std::vector<CoreFunction>& func
         call.trackId = "master";
         call.trackName = "Master";
       } else {
+        // The first track that matches wins, and its id beats its name - the way the rest of Core chooses (the
+        // effect chain below, role_tools' sectionSpan). Without stopping, the LAST track with that name won.
         for (const auto& t : song.tracks)
-          if (t.id == on || sameName(t.name, on)) track = &t;
+          if (t.id == on) { track = &t; break; }
+        if (!track)
+          for (const auto& t : song.tracks)
+            if (sameName(t.name, on)) { track = &t; break; }
         if (track) {
           call.trackId = track->id;
           call.trackName = track->name;
@@ -670,12 +675,23 @@ Proposal validateProposal(const json& raw, const std::vector<CoreFunction>& func
         }
         call.args[a->id] = v;
       }
+    // A Mix with nothing left to set is not a call: applied it changes nothing and still says "Mix on X", and the
+    // app commits that as an undo step (audit 2026-11-17, item 26). An "open" does change nothing on purpose and
+    // is answered above; only the mixer refuses an empty set of knobs.
+    if (f->family == "mix" && call.args.empty()) {
+      p.problems.push_back("Mix: no volume or pan to set: left out");
+      continue;
+    }
     // A section: a rise.
     const std::string section = str(c, "section");
     if (!section.empty()) {
       const doc::Section* s = nullptr;
+      // Same as a track's "on": the first section that matches, the id before the name.
       for (const auto& x : song.sections)
-        if (x.id == section || sameName(x.name, section)) s = &x;
+        if (x.id == section) { s = &x; break; }
+      if (!s)
+        for (const auto& x : song.sections)
+          if (sameName(x.name, section)) { s = &x; break; }
       if (!f->rises) {
         call.warnings.push_back(f->name + " does not rise over a section: it acts on the whole track (automate it by hand for one part)");
       } else if (!s) {
