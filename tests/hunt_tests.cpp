@@ -12,6 +12,7 @@
 #include "autosave.hpp"
 #include "bounce.hpp"
 #include "edit.hpp"
+#include "pattern_rack.hpp"
 #include "randomize.hpp"
 #include "storage.hpp"
 #include "templates.hpp"
@@ -337,6 +338,102 @@ TEST("caca audit 2026-11-17 #1: os nomes que o randomizador da aos padroes entra
   CHECK_EQ(core::doc::openFile(dir / "song.core").document.tracks.size(), d.tracks.size());
   core::doc::writeAutosave(dir, "core-audit-1", 4242, d, "", 1);  // antes: a mesma recusa, mais alto
   CHECK(fs::exists(core::doc::autosavePath(dir, "core-audit-1")));
+}
+
+// O mesmo buraco do item 1, pelo rack. A janela "Rename pattern" aceita 60 caracteres (PatternsWindow.cpp:795,
+// substring(0, 60)) e o nome do slot vai direitinho para o nome de um padrao (pattern_rack.cpp:184 e :294) — que
+// o leitor recusa acima de 40 BYTES. 60 "ç" sao 120 bytes: a musica guarda-se e volta a abrir-se, e o autosave
+// passa a falhar calado na cancao que a app acabou de aceitar.
+TEST("caca audit #1 (irmao): os nomes que o rack da aos padroes entram no leitor") {
+  const fs::path dir = freshDir("audit1-rack");
+  std::string name;
+  for (int i = 0; i < 60; ++i) name += "\xc3\xa7";  // 120 bytes, 60 letras: o maximo do dialog
+  Document d = core::doc::newTemplateDocument();
+  const auto shown = core::doc::rackSlots(d);
+  CHECK(!shown.empty());
+  core::doc::renameRackSlot(d, shown.front().id, name);   // o que o dialog faz
+  const std::string duplicated = core::doc::duplicateRackSlot(d, shown.front().id);  // escreve o nome em cada copia
+  const std::string added = core::doc::addRackSlot(d, name, 4);                       // slot novo, sem padroes
+  core::doc::rackPatternFor(d, added, "kick");            // ai o padrao nasce com o nome do slot
+  size_t over = 0, split = 0;
+  for (const auto& t : d.tracks)
+    for (const auto& p : t.patterns) {
+      if (p.name.size() > 40) ++over;
+      if (!validUtf8(p.name)) ++split;
+    }
+  CHECK_EQ(over, (size_t)0);
+  CHECK_EQ(split, (size_t)0);
+  for (const auto& s : core::doc::rackSlots(d)) {
+    CHECK(s.name.size() <= 40);
+    CHECK(validUtf8(s.name));
+  }
+  CHECK(!duplicated.empty());
+  core::doc::saveFile(d, dir / "song.core");
+  CHECK_EQ(core::doc::openFile(dir / "song.core").document.tracks.size(), d.tracks.size());
+  core::doc::writeAutosave(dir, "core-audit-1", 4242, d, "", 1);
+  CHECK(fs::exists(core::doc::autosavePath(dir, "core-audit-1")));
+
+  // O controlo: um nome curto passa pelo rack exactamente como foi escrito, com " copy" atraz.
+  Document e = core::doc::newTemplateDocument();
+  const std::string brk = core::doc::addRackSlot(e, "Break", 4);
+  CHECK_EQ(core::doc::rackPatternFor(e, brk, "kick").name, std::string("Break"));
+  const std::string cp = core::doc::duplicateRackSlot(e, brk);
+  const auto after = core::doc::rackSlots(e);
+  const core::doc::PatternSlot* found = core::doc::findRackSlot(after, cp);
+  CHECK(found != nullptr);
+  if (found) CHECK_EQ(found->name, std::string("Break copy"));
+}
+
+// Os outros tres sitios que colavam um sufixo a um nome e cortavam por bytes: a copia ficava com o MESMO nome
+// da origem, e nao se distinguia dela na janela nem na cancao guardada.
+TEST("caca audit #1 (irmao): duplicar com o nome todo cheio da um nome diferente") {
+  std::string forty;
+  for (int i = 0; i < 20; ++i) forty += "\xc3\xa7";              // 40 bytes: o limite de uma seccao e de um padrao
+  CHECK_EQ(forty.size(), (size_t)40);
+
+  Document d = core::doc::newEmptyDocument();
+  const std::string a = core::doc::addSection(d, forty, 0, 4 * core::doc::kPpq);
+  const std::string b = core::doc::duplicateSection(d, a);
+  std::string copied;
+  for (const auto& s : d.sections) if (s.id == b) copied = s.name;
+  CHECK(!copied.empty());
+  CHECK(copied != forty);                                        // o "2" tem de se ver
+  CHECK(copied.size() <= 40);
+  CHECK(validUtf8(copied));
+  CHECK(copied.find("2") != std::string::npos);
+
+  Document e = core::doc::newTemplateDocument();
+  core::doc::Track& kick = core::doc::trackById(e, "kick");
+  const std::string pid = kick.patterns.front().id;
+  kick.patterns.front().name = forty;
+  const std::string second = core::doc::addClip(kick, pid, 4 * core::doc::kPpq, kick.findPattern(pid)->lengthTicks);
+  const std::string own = core::doc::makeClipUnique(kick, second);   // "Independent copy" do clique direito
+  std::string unique;
+  for (const auto& p : kick.patterns) if (p.id == own) unique = p.name;
+  CHECK(!unique.empty());
+  CHECK(unique != forty);
+  CHECK(unique.size() <= 40);
+  CHECK(validUtf8(unique));
+
+  Document f = core::doc::newEmptyDocument();
+  std::string eighty;
+  for (int i = 0; i < 40; ++i) eighty += "\xc3\xa7";                // 80 bytes: o limite de uma faixa
+  const std::string track = core::doc::addAudioTrack(f, eighty);
+  const std::string twin = core::doc::duplicateTrack(f, track);
+  std::string twinName;
+  for (const auto& t : f.tracks) if (t.id == twin) twinName = t.name;
+  CHECK(!twinName.empty());
+  CHECK(twinName != eighty);
+  CHECK(twinName.size() <= 80);
+  CHECK(validUtf8(twinName));
+
+  // O controlo: com nome curto o sufixo e exactamente o que sempre foi.
+  Document g = core::doc::newEmptyDocument();
+  const std::string shortA = core::doc::addSection(g, "Intro", 0, 4 * core::doc::kPpq);
+  const std::string shortB = core::doc::duplicateSection(g, shortA);
+  std::string shortCopy;
+  for (const auto& s : g.sections) if (s.id == shortB) shortCopy = s.name;
+  CHECK_EQ(shortCopy, std::string("Intro 2"));
 }
 
 CORE_TEST_MAIN
