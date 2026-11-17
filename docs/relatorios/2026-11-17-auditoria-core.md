@@ -1,7 +1,8 @@
 # Relatório — audit "ARREDURA PROFUNDA DO CORE", 2026-11-17
 
 Repo: `dmo-app/qwen-core`, rama `main`. Este ficheiro é o registo do que foi feito, do que foi medido, e do
-que ficou por resolver. A página [`ESTADO.md`](../../ESTADO.md) aponta para aqui.
+que ficou por resolver. A página [`ESTADO.md`](../../ESTADO.md) aponta para aqui, e
+[`2026-11-17-RESUMO.md`](2026-11-17-RESUMO.md) é a versão de cinco minutos.
 
 Origem: auditoria do Diogo de 2026-11-17 sobre o snapshot `95f411a`, 31 itens. Cada item foi re-verificado
 contra o código actual antes de se mexer nele (a auditoria foi escrita sobre um snapshot mais velho, e alguns
@@ -52,7 +53,7 @@ Dos 31 itens: **21 corrigidos** (1, 2, 3a, 3b, 4, 5, 7, 8, 10, 11, 12, 13, 14, 1
 
 | Itens | O que estava mal | Commit |
 |---|---|---|
-| 10, 11, 12, 13, 14 | Cabeçalho WAV lido antes de alocar memória (recusa com o limite em 1 MiB: 6 396 009 → 9 489 bytes tocados; leitura ao ritmo do projecto: 8 533 586 → 4 542 070 bytes); `freeze` mais curto do que um grão; `adopt` no tempo certo das duas escalas e nota-offs reservadas; o dispositivo que está a tocar posto de parte num `engine.start` falhado | `f89ed11` + `360bdb7` |
+| 10, 11, 12, 13, 14 | O cabeçalho do WAV passou a ser interpretado e validado antes de se tocar no áudio (`parseWavHeader` + a nova `wavInfo`): ficheiro malformado com o limite em 1 MiB custa 6 396 009 → 9 489 bytes lidos, e ler ao ritmo do projecto passou de 8 533 586 → 4 542 070 porque o `resample` ao mesmo ritmo devolvia uma cópia; `freeze` mais curto do que um grão; `adopt` no tempo certo das duas escalas e nota-offs reservadas; o dispositivo que está a tocar posto de parte num `engine.start` falhado | `f89ed11` + `360bdb7` |
 | 22, 26 | No `validateProposal` do control a **última** faixa com o nome pedido ganhava (o resto do Core escolhe sempre a primeira, e o `id` não batia antes do nome); e uma chamada `Mix` sem botões era aceite, aplicada como passo de undo e dizia "Mix on Kick" sem tocar em nada | `d342928` + `cf4f12d` |
 | 1, 2, 3a, 3b, 4, 5 | Nomes de padrões do randomizador acima dos 40 bytes do leitor e com caracteres partidos; MIDI que prometia 2 pistas e trazia 1 era aceite calado; índice da biblioteca e cache do motor reusados por caminho+tamanho+data (ficheiro trocado por dentro ficava com o `sha`/nível velho e o áudio velho); `duplicateSection` esquecia os pontos de tempo dentro da secção; `toolSuck`/build-up/fx-por-intenção escreviam meia canção antes de recusar por cadeia cheia | `2dc9353` + `91a2836` |
 | 1 (família) | O mesmo buraco dos nomes por outros caminhos: o dialog "Rename pattern" aceita 60 caracteres e o nome ia sem limite para dentro de um padrão (`rackPatternFor`, `duplicateRackSlot`) — `saveFile` rebentava numa canção que a app aceitou; e `duplicateTrack`/`makeClipUnique`/`duplicateSection`, que com o nome cheio davam à cópia exactamente o nome do original. A regra dos 40/80 bytes passou a existir uma vez (`cutUtf8`/`nameWithSuffix` ao lado do leitor) em vez de três cópias escritas à mão | `3146cce` + `7741a4e` |

@@ -9,6 +9,8 @@ O detalhe todo está em **[`docs/relatorios/2026-11-17-auditoria-core.md`](docs/
 **não** foi medido; o que falta fazer; e as decisões que preciso de ti. Esta página é só o painel: não duplica
 o relatório, aponta para ele.
 
+Para ler em cinco minutos: **[`docs/relatorios/2026-11-17-RESUMO.md`](docs/relatorios/2026-11-17-RESUMO.md)**.
+
 Pasta de relatórios: [`docs/relatorios/`](docs/relatorios/). Um ficheiro por dia/assunto, sempre começados por
 "o que foi medido".
 
