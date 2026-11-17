@@ -87,8 +87,50 @@ PY
    `templates/` e `pcore/` do core-main. Passar qualquer um dos lados a ler daqui é mudança de arquitectura
    (D50) e precisa de decisão numerada; não fiz nada disso. A regra de hoje do AICORE (add-on fora do binário)
    aponta no mesmo sentido: se o conhecimento de criação vive fora do Core, quem o lê é o pacote, não o `Core.exe`.
-3. **Fronteira do corte** (CC-09): o critério está escrito acima para ser contestável. Mouve-o e regenero.
+3. **Fronteira do corte** (CC-09): o critério está escrito acima para ser contestável. Mexe nela e eu regenero.
 4. **Risco residual**: os 45 JSON em `padroes/` são uma segunda cópia dos dados. Se forem editados aqui, o Core
    não os vê e os dois divergem silenciosamente. Recomendação: tratar `padroes/` como derivação (regenerar, não editar)
    enquanto a app não for apontada para aqui; decidir depois de (2).
 5. **Não medido de propósito**: nada foi aberto nem ouvido. Um `git show`-a-`git show` não prova som.
+
+---
+
+## Addendum — 2026-11-17, mais tarde no mesmo dia: ainda não é JSON
+
+O dono, ao ver a primeira versão: **"essa informação não é para entrar em json ainda"**. Correcção de direcção,
+não de factos — o conteúdo pedido era este, mas publicado como ficheiros de dados não está autorizado ainda.
+Registo aqui em adendum datado, sem reescrever o acima (regra 9 do procedimento).
+
+**O que mudou em `core-create`** (`main` = `de92f90` → **`2d438c9`**):
+
+- Fora os **50 JSON** que eu tinha publicado: 45 cópias de `patterns/*.json`, 4 manifestos `estilos/<id>/padroes.json`
+  e o `catalogo/pcore-estilos.json` cru. Não apaguei nada do core-main — o que saiu foi a cópia; o commit anterior
+  fica no histórico do repo se for preciso comparar.
+- Uma **página por padrão** em `padroes/<papel>__<id>.md`: origem, papel, estado, fonte, root (com o nome que o
+  próprio Core dá à nota), comprimento, estilos que o declaram, tags, e a tabela das notas todas
+  (tick, compasso.tempo, duração, nota, velocity). **1034 notas** nos 45 padrões.
+- O catálogo passa a `catalogo/estilos.md` com os campos todos do `pcore/styles.json`; a tabela dos 7 estilos
+  está lá, a das partes continua em `formas.md`.
+- Repo actual: **87 blobs, 0 JSON, 86 markdown, 343 KB** (medido pela API `git/trees/2d438c9?recursive=1`).
+
+**Verificação nova**, feita à parte do gerador (reparsei as páginas escritas e comparei com o git do core-main,
+nota a nota — tick, duração, nome da nota pela regra `template_sheet.cpp:31`, velocity): **45/45 páginas
+conformes, 0 divergências, 0 páginas em falta**. Links locais: 389, **0 partidos**. `find -name '*.json'`: **0**.
+
+**Erro meu, medido e corrigido neste addendum:** no commit anterior o **BPM do `INDICE.md` não vinha do catálogo**
+— vinha do último template do estilo, porque a variável do laço se sobrepunha à do estilo. Ficou publicado
+darkpsycore **210** (é 225), hitech **220** (é 190), slambient **250** (é 300). Os `estilo.md` estavam certos; o
+índice não. Corrigido no gerador (`index_rows` vai buscar `(st or {}).get("bpm")`), verificado acima.
+
+**Itens afectados deste relatório:**
+
+| ID | Antes | Agora |
+|---|---|---|
+| CC-04 (45/45 byte-idênticos) | válido | **sem objecto** — não há cópias de bytes; em vez disso 1034/1034 notas conferidas |
+| CC-05, CC-06 (fichas 3,2 MB → 68 KB, sem tabelas de app) | válido | **inalterado** |
+| CC-10 (dados nos dois sítios) | duplicado de ficheiros | **transcrição**, não duplicado: nenhuma estrutura de dados publicada |
+| Pendência 4 (risco de divergência silenciosa em `padroes/*.json`) | aplicável | **adiado** — volta quando decidires o formato JSON |
+
+**O que fica.** A informação está toda legível e organizada por estilo, como pediste, e não há um único JSON.
+Quando disseres o formato (nome de campo, se as notas ficam em tabela markdown ou em ficheiro próprio, se
+`core-create` é fonte ou relatório), o gerador volta a emitir — ele já leu tudo isso do core-main uma vez.

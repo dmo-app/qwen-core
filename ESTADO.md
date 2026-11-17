@@ -11,7 +11,7 @@ Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGEN
 | Produto e fronteira | Documentados; commits ecd2c7a e 5445152; não implementam limpeza | [Produto](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md), [fronteira](docs/FRONTEIRA-CORE-AICORE.md) |
 | Catálogo | Inventário de 45 patterns: 39 origem AICORE, 6 outras; preservação decidida | Anexo da fronteira / PROD-03 |
 | Organização documental | Regras, índice, procedimento, modelo e relatório; sem alteração de código | [Relatório](docs/relatorios/2026-11-17-organizacao-repo.md) |
-| Criação de música fora do core-main → `dmo-app/core-create` | Extracção só de leitura de `origin/main` = `52d46c0`; 8 estilos, 45 padrões (45/45 byte-idênticos), 21 fichas de 3,2 MB → 68 KB; core-main intacto | [Relatório](docs/relatorios/2026-11-17-core-create.md); repo `core-create main` = `de92f90` |
+| Criação de música fora do core-main → `dmo-app/core-create` | Extracção só de leitura de `origin/main` = `52d46c0`; 8 estilos, 45 páginas de padrão (1034 notas conferidas contra o git), 21 fichas de 3,2 MB → 68 KB. **Só markdown, 0 JSON**, por instrução do dono de hoje; core-main intacto | [Relatório](docs/relatorios/2026-11-17-core-create.md) com addendum datado; repo `core-create main` = `2d438c9` |
 
 ## Próximo trabalho
 
@@ -25,7 +25,7 @@ Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGEN
 | 2 | Preservar Pattern Maker e alinhamento pratos/kick/baixo | Provas de regressão antes de retirar módulos |
 | 3 | Formatos adicionais de plugins | Preparar matriz; não prometer suporte universal |
 | 3 | Contrato docs/contracts/core-calls.md | Ausente no snapshot auditado; distinguir legado de contrato alvo |
-| 3 | Curadoria do core-create | `psytrance` não tem entrada em `pcore/styles.json` nem template; decidir se entra no catálogo ou sai dos padrões. Decidir também se algum lado passa a ler `core-create` (D50) enquanto o core-main continua a fonte da app |
+| 3 | Curadoria do core-create | `psytrance` não tem entrada em `pcore/styles.json` nem template; decidir se entra no catálogo ou sai dos padrões. Falta a tua decisão do **formato**: por agora o repo é só markdown, 0 JSON (instrução de 17/11); quando o formato for decidido, o gerador volta a emitir. Decidir também se algum lado passa a ler `core-create` (D50) enquanto o core-main continua a fonte da app |
 | 3 | Control itens 19–25 e variantes dos bugs | Revalidar e classificar Core/AICORE pela fronteira, sem mover código automaticamente |
 
 ## O que não está provado
