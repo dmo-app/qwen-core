@@ -60,10 +60,10 @@ public:
   void paint(juce::Graphics& g) override {
     g.setColour(theme::kPanel);
     g.fillRoundedRectangle(getLocalBounds().toFloat(), theme::kCorner);
-    const auto head = getLocalBounds().removeFromTop(kHead);
+    auto head = getLocalBounds().removeFromTop(kHead);
     const int half = head.getWidth() / 2;
     for (int i = 0; i < 2; ++i) {
-      const auto tab = head.removeFromLeft(half);
+      auto tab = head.removeFromLeft(half);
       const bool active = (i == 0) == (mode_ == Mode::tools);
       g.setColour(active ? theme::kTitle : theme::kMuted);
       g.setFont(juce::FontOptions(theme::kFontBody, active ? juce::Font::bold : juce::Font::plain));

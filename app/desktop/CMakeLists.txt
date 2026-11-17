@@ -44,16 +44,32 @@ add_custom_command(TARGET CoreApp POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:core-engine> $<TARGET_FILE_DIR:CoreApp>
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
           ${CMAKE_CURRENT_SOURCE_DIR}/demo.core-document.json
-          $<TARGET_FILE_DIR:CoreApp>/demo.core-document.json
-  # The shipped templates are exactly the repo's: a template removed from the repo leaves the app too.
+          $<TARGET_FILE_DIR:CoreApp>/demo.core-document.json)
+
+# Resources that ship beside the app (audit 29): the copies used to live in POST_BUILD, so they only refreshed
+# when the .exe relinked — a templates/lang/patterns/pcore edit alone left a stale app folder, package and zip.
+# Now one stamped step depends on the files themselves (CONFIGURE_DEPENDS re-globs on any add/remove), and both
+# CoreApp and core-package depend on it. The folders are removed before copying, so a file deleted from the repo
+# leaves the app too (the shipped templates are exactly the repo's — also lang, patterns and pcore now).
+file(GLOB_RECURSE CORE_APP_RESOURCES CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../templates/*
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../lang/*
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../patterns/*
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../pcore/*)
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/core_resources.stamp
   COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:CoreApp>/templates
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../templates $<TARGET_FILE_DIR:CoreApp>/templates
-  # Core in another language (Settings > General > Language): docs/contracts/core-language.md.
+  COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:CoreApp>/lang
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../lang $<TARGET_FILE_DIR:CoreApp>/lang
-  # Patterns of the Library's Patterns tab (KBBB, hats, cymbals, build-ups...); Diogo's own go to %APPDATA%\Core\Patterns.
+  COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:CoreApp>/patterns
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../patterns $<TARGET_FILE_DIR:CoreApp>/patterns
-  # PCore: styles, parts, shapes and scales (docs/contracts/core-pcore.md).
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../pcore $<TARGET_FILE_DIR:CoreApp>/pcore)
+  COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:CoreApp>/pcore
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../pcore $<TARGET_FILE_DIR:CoreApp>/pcore
+  COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_BINARY_DIR}/core_resources.stamp
+  DEPENDS ${CORE_APP_RESOURCES}
+  COMMENT "Copying the app's resources (templates, lang, patterns, pcore)")
+add_custom_target(core_resources DEPENDS ${CMAKE_BINARY_DIR}/core_resources.stamp)
+add_dependencies(CoreApp core_resources)
 
 
 # Development package (M1c): a zip with Core.exe, core-engine.exe and the demo, runnable on a Windows
@@ -70,5 +86,5 @@ add_custom_target(core-package
   COMMAND ${CMAKE_COMMAND} -E copy_directory $<TARGET_FILE_DIR:CoreApp>/pcore ${CMAKE_BINARY_DIR}/package/Core/pcore
   COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/package
           ${CMAKE_COMMAND} -E tar cf ${CMAKE_BINARY_DIR}/Core-windows-x64.zip --format=zip Core
-  DEPENDS CoreApp
+  DEPENDS CoreApp core_resources
   COMMENT "Packing build/Core-windows-x64.zip")

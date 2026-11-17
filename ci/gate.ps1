@@ -29,7 +29,8 @@ if (-not (Test-Path $vcvars)) {
 if (-not (Test-Path $vcvars)) { Write-Error "vcvars64.bat nao encontrado"; exit 1 }
 
 $juceArg = ""
-if (Test-Path $Juce) { $juceArg = "-DFETCHCONTENT_SOURCE_DIR_JUCE=$Juce" }
+# Audit 31: a definição vai para o .bat JÁ entre aspas — um caminho com espaços partia-se em dois argumentos.
+if (Test-Path $Juce) { $juceArg = '"-DFETCHCONTENT_SOURCE_DIR_JUCE=' + $Juce + '"' }
 $label = if ($Desktop) { "" } else { "-L merge" }
 $log = Join-Path $Build "gate.log"
 # Um .bat temporario numa pasta sem espacos: o cmd /c com caminhos com espacos ja partiu launchers antes.
@@ -37,9 +38,10 @@ $bat = Join-Path $env:TEMP "core-gate.bat"
 @"
 @echo off
 call "$vcvars" > "$Build\vcvars.log" 2>&1 || exit /b 1
-cmake -S "$src" -B "$Build" -G Ninja -DCMAKE_BUILD_TYPE=Release $juceArg || exit /b 1
+cmake -S "$src" -B "$Build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCORE_BUILD_TESTS=ON $juceArg || exit /b 1
 cmake --build "$Build" --parallel $Jobs || exit /b 1
-ctest --test-dir "$Build" $label --output-on-failure --timeout 600 || exit /b 1
+REM Audit 30: --no-tests=error fecha o verde-falso quando a cache tem CORE_BUILD_TESTS=OFF (medido em Linux: rc 0 -> 8).
+ctest --test-dir "$Build" $label --output-on-failure --timeout 600 --no-tests=error || exit /b 1
 "@ | Set-Content -Encoding ASCII $bat
 
 $t0 = Get-Date

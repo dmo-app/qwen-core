@@ -6969,7 +6969,8 @@ void MainComponent::selfTestStep() {
       if (inStep > 800) {
         session_->stop();
         // M6: an autosave left by a session that is not running (a crash) comes back as the song, unsaved.
-        const juce::File folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("core-selftest-autosave");
+        const juce::File folder = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                      .getChildFile("core-selftest-autosave-" + juce::String(currentProcessId()));  // audit 28: two concurrent self-tests no longer wipe each other
         folder.deleteRecursively();
         doc::Document copy = history_.current();
         copy.name = "Recovered by the self-test";

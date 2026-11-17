@@ -73,21 +73,28 @@ juce::String copySamples(const juce::File& source, const juce::File& folder, con
   juce::Array<juce::File> files;
   for (const auto& entry : juce::RangedDirectoryIterator(source, true, "*", juce::File::findFiles))
     if (!skipped(entry.getFile().getRelativePathFrom(source).replaceCharacter('\\', '/'))) files.add(entry.getFile());
-  juce::StringArray copied;
+  // Audit 27: the manifest read BEFORE copying decides ownership. A path becomes ours only when this install
+  // really copied it, or an earlier install already listed it. Before, a pre-existing file that merely matched
+  // path+size+date (copied back from a backup, robocopy /COPY:DAT) was listed without ever being copied, and
+  // uninstall deleted the user's file.
+  juce::StringArray listed = juce::StringArray::fromLines(folder.getChildFile("samples.txt").loadFileAsString());
+  listed.removeEmptyStrings();
+  juce::StringArray ours;
   int failed = 0;
   for (int i = 0; i < files.size(); ++i) {
     const juce::File& from = files.getReference(i);
     const juce::String relative = from.getRelativePathFrom(source);
     const juce::File to = target.getChildFile(relative);
+    const juce::String rel = relative.replaceCharacter('\\', '/');
     const bool same = to.existsAsFile() && to.getSize() == from.getSize() && to.getLastModificationTime() == from.getLastModificationTime();
-    if (!same && !(to.getParentDirectory().createDirectory() && from.copyFileTo(to))) ++failed;
-    else copied.add(relative.replaceCharacter('\\', '/'));
+    if (!same) {
+      if (to.getParentDirectory().createDirectory() && from.copyFileTo(to)) ours.add(rel);
+      else ++failed;
+    } else if (listed.contains(rel)) ours.add(rel);  // ours from an earlier install: stays, no copy needed
     if (progress && (i % 25 == 0 || i + 1 == files.size())) progress(i + 1, files.size());
   }
   // Earlier installs' files stay listed too (they are still ours to remove).
-  juce::StringArray listed = juce::StringArray::fromLines(folder.getChildFile("samples.txt").loadFileAsString());
-  listed.addArray(copied);
-  listed.removeEmptyStrings();
+  listed.addArray(ours);
   listed.removeDuplicates(true);
   folder.getChildFile("samples.txt").replaceWithText(listed.joinIntoString("\n") + "\n");
   if (failed > 0) return juce::String(failed) + " samples could not be copied to " + target.getFullPathName() + " (is the disk full?). Install again to finish.";

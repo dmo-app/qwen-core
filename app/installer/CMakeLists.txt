@@ -3,6 +3,9 @@
 #   cmake --build build --target CoreSetup   ->  build/app/installer/CoreSetup_artefacts/Release/Core Setup.exe
 set(CORE_STAGE ${CMAKE_CURRENT_BINARY_DIR}/stage)
 set(CORE_PACKAGE_ZIP ${CMAKE_CURRENT_BINARY_DIR}/CorePackage.zip)
+# Audit 29: the zip carries the repo's resources, so it rebuilds when they change, not only when the .exe does.
+file(GLOB_RECURSE CORE_PACKAGE_RESOURCES CONFIGURE_DEPENDS
+  ${CMAKE_SOURCE_DIR}/templates/* ${CMAKE_SOURCE_DIR}/lang/* ${CMAKE_SOURCE_DIR}/patterns/* ${CMAKE_SOURCE_DIR}/pcore/*)
 add_custom_command(OUTPUT ${CORE_PACKAGE_ZIP}
   COMMAND ${CMAKE_COMMAND} -E rm -rf ${CORE_STAGE}
   COMMAND ${CMAKE_COMMAND} -E make_directory ${CORE_STAGE}
@@ -14,6 +17,7 @@ add_custom_command(OUTPUT ${CORE_PACKAGE_ZIP}
   COMMAND ${CMAKE_COMMAND} -E chdir ${CORE_STAGE} ${CMAKE_COMMAND} -E tar cf ${CORE_PACKAGE_ZIP} --format=zip
           Core.exe core-engine.exe demo.core-document.json templates lang patterns pcore
   DEPENDS CoreApp core-engine ${CMAKE_SOURCE_DIR}/app/desktop/demo.core-document.json
+          ${CORE_PACKAGE_RESOURCES}
   COMMENT "Packing the Core package for the installer")
 juce_add_binary_data(CoreSetupData HEADER_NAME CoreSetupData.h NAMESPACE CoreSetupData SOURCES ${CORE_PACKAGE_ZIP})
 

@@ -4,6 +4,7 @@
 //   Core.exe --self-test picture.png  plays, changes the BPM, saves a picture of the window, exits 0/1
 #include <fstream>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "Autosave.h"  // currentProcessId(): the self-test folder is named by it (audit 28)
 #include "Diagnostics.h"
 #include "MainComponent.h"
 #include "Theme.h"
@@ -105,9 +106,19 @@ public:
     content_ = content;
     window_ = std::make_unique<MainWindow>(getApplicationName() + " - " + juce::String::fromUTF8(document.name.c_str()), new ScaledHolder(content));
     if (selfTest.isNotEmpty()) {
-      const juce::File picture = juce::File::getCurrentWorkingDirectory().getChildFile(selfTest);
-      content->runSelfTest(picture, [this, picture](bool ok, juce::String report) {
-        picture.withFileExtension("txt").replaceWithText(report + "\n");
+      const juce::File requested = juce::File::getCurrentWorkingDirectory().getChildFile(selfTest);
+      // Audit 28: the self-test deletes and overwrites things NEXT TO its output path (<name>.core, <name>.wav,
+      // <name>-audio/, <name>-saved/) — aimed at a real path, a typo (Core.exe --self-test MySong.core) could
+      // destroy a user's song. Everything now lives in its own fresh temp folder; only the two asked-for
+      // outputs, the picture and its .txt report, are copied out at the end.
+      juce::File work = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("core-selftest-" + juce::String(core::app::currentProcessId()));
+      for (int n = 1; work.exists(); ++n) work = work.getSiblingFile(work.getFileNameWithoutExtension() + "-" + juce::String(n));
+      work.createDirectory();
+      const juce::File picture = work.getChildFile(requested.getFileName().isEmpty() ? juce::String("self-test.png") : requested.getFileName());
+      content->runSelfTest(picture, [this, picture, requested, work](bool ok, juce::String report) {
+        picture.copyFileTo(requested);
+        requested.withFileExtension("txt").replaceWithText(report + "\n");
+        work.deleteRecursively();
         setApplicationReturnValue(ok ? 0 : 1);
         quit();
       });
