@@ -12,19 +12,18 @@ Desde 2026-11-16. Substituem as 11 suites antigas (removidas a 2026-11-15) com o
 
 | Label | O quê | Quando |
 |---|---|---|
-| `merge` | `engine_tests`, `domain_tests`, `cli_version`, `cli_demo_render`, `cli_measure` (segundos) | cada build, antes de cada merge, CI |
-| `desktop` | `desktop_self_test`: `Core.exe --self-test` no null device (abre a janela ~20 s) | antes de promover para `Main/`, CI Windows |
+| `merge` | Suites registadas com label merge em CMakeLists.txt (fonte actual) | gate local antes de integrar mudanças |
+| `desktop` | `desktop_self_test`: `Core.exe --self-test` no null device (abre a janela ~20 s) | validação desktop no Windows; não comprova dispositivo real |
 
 ## Correr
 
 ```
-ctest --test-dir <build> -L merge --output-on-failure      # rápido
-ctest --test-dir <build> --output-on-failure               # tudo
+ctest --test-dir <build> -L merge --output-on-failure --no-tests=error # gate
+ctest --test-dir <build> --output-on-failure --no-tests=error # tudo
 <build>/tests/engine_tests render                          # só os casos com "render" no nome
 ```
 
-Gate de um comando: `ci/gate.ps1` (Windows, PC do Diogo) ou `ci/gate.sh` (Linux/WSL). CI no GitHub:
-`.github/workflows/ci.yml`.
+Gate de um comando: `ci/gate.ps1` (Windows, PC do Diogo) ou `ci/gate.sh` (Linux/WSL). Não há workflow GitHub na árvore consultada em 17-11-2026; não anunciar CI activo. A lista de testes efectiva é tests/CMakeLists.txt.
 
 ## Onde pôr um teste novo
 

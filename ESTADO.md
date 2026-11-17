@@ -1,66 +1,42 @@
-# ESTADO do Core — qwen-core
+# Estado do Core
 
-> **Nova clarificação do dono:** ficam apenas **Pattern Maker e Tools** como ferramentas criativas próprias.
-> **Tools por explorar:** painéis simplificados com abertura directa do editor de cada instância da chain. Remover Kick Design/Cymbal Design. Suporte de plugins extensível a vários formatos; não prometer compatibilidade universal já entregue.
-> Preservar catálogo de padrões e alinhamento de pratos/kick/baixo; som por plugins externos. Retirar módulos antigos, samples distribuídos e menus redundantes.
-> [Direcção e plano de limpeza](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md). **Documentado; ainda não implementado.**
+Actualizado em 17-11-2026. Base desta organização: `5445152e522ed071038c267a3f98bed48e370b44`.
+Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGENTS.md), procedimento em [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
-> **FRONTEIRA DO DONO — AI FORA POR AGORA.**
-> Ler [FRONTEIRA-CORE-AICORE.md](docs/FRONTEIRA-CORE-AICORE.md) antes de mexer em dependências, processos, persistência ou âmbito.
-> Core: DAW, catálogo musical, validação integral e Undo. Pacote externo: modelo, chaves, memória/SQLite, chat/JSONL e bridge AICORE.
-> **Não mover/apagar código ou dados sem decisão numerada.**
-> A bridge/painel ainda estão ligados no snapshot `599d558`; `CORE_BUILD_AI=OFF` e `ai_boundary_static` são requisitos ainda não confirmados neste repo.
+## Feito e evidência
 
-O restante painel conserva os números e pendências do audit anterior; não são resultados reexecutados pela entrega documental da fronteira.
+| Entrega | Estado | Fonte |
+| --- | --- | --- |
+| Audit de bugs de 17/11 | Reporta 21 itens corrigidos e 10 abertos; 15 testes, 113 casos, 1456 verificações em Linux | [Audit](docs/relatorios/2026-11-17-auditoria-core.md); não reexecutado nesta organização |
+| Produto e fronteira | Documentados; commits ecd2c7a e 5445152; não implementam limpeza | [Produto](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md), [fronteira](docs/FRONTEIRA-CORE-AICORE.md) |
+| Catálogo | Inventário de 45 patterns: 39 origem AICORE, 6 outras; preservação decidida | Anexo da fronteira / PROD-03 |
+| Organização documental | Regras, índice, procedimento, modelo e relatório; sem alteração de código | [Relatório](docs/relatorios/2026-11-17-organizacao-repo.md) |
 
-Última actualização: **2026-11-17**, às 21:00 (hora desta caixa), sobre `main` = `7741a4e`.
+## Próximo trabalho
 
-## Relatório
+| Prioridade | Pendência | Condição / evidência necessária |
+| --- | --- | --- |
+| 1 | Item 9: captura completa de estado, save/replace/remove/export | Revalidar código actual. D63 foi sugestão; política final por operação não está ratificada |
+| 1 | Proposta inteira tudo-ou-nada e isolamento AI | Fronteira define alvo; bridge/painel ainda ligados no snapshot auditado. OFF e ai_boundary_static não demonstrados |
+| 1 | Item 6: nomes reservados Windows no export Bitwig/MIDI | Texto já recebido: CON/NUL podem produzir nome inválido; revalidar bitwig.cpp/midi.cpp e testar. Não executado em Windows |
+| 2 | Remover escolhas de instrumentos próprios, Kick Design/Cymbal Design, módulos antigos e samples distribuídos | Direcção decidida; inventário e implementação pendentes, preservando projectos/padrões |
+| 2 | Explorar painéis de Tools e limpar menus | Chain por pistas/intervalos; abrir editor de cada instância; desenho final por aprovar |
+| 2 | Preservar Pattern Maker e alinhamento pratos/kick/baixo | Provas de regressão antes de retirar módulos |
+| 3 | Formatos adicionais de plugins | Preparar matriz; não prometer suporte universal |
+| 3 | Contrato docs/contracts/core-calls.md | Ausente no snapshot auditado; distinguir legado de contrato alvo |
+| 3 | Control itens 19–25 e variantes dos bugs | Revalidar e classificar Core/AICORE pela fronteira, sem mover código automaticamente |
 
-O detalhe todo está em **[`docs/relatorios/2026-11-17-auditoria-core.md`](docs/relatorios/2026-11-17-auditoria-core.md)**
-— o que foi corrigido, item a item, com a prova vermelha e a verde de cada fornada; o que foi medido e o que
-**não** foi medido; o que falta fazer; e as decisões que preciso de ti. Esta página é só o painel: não duplica
-o relatório, aponta para ele.
+## O que não está provado
 
-Para ler em cinco minutos: **[`docs/relatorios/2026-11-17-RESUMO.md`](docs/relatorios/2026-11-17-RESUMO.md)**.
+- Runtime Windows dos itens 7, 8, 15, 18, 27, 28 e 31 permanece não medido segundo o audit.
+- Nenhum teste do produto foi corrido nas entregas documentais desta sessão.
+- Independência com pacote AI ausente, pipes AI e compatibilidade de formatos adicionais não estão demonstrados.
+- Cache: audit reporta hash inicial de 64 KiB e revalidação parcial WAV; tail/hash total foram sugestões, não implementação comprovada.
+- Não há workflow GitHub na árvore consultada. Gates locais existentes: ci/gate.sh e ci/gate.ps1. “Tier1/Tier2” não são critérios executáveis definidos aqui.
 
-Pasta de relatórios: [`docs/relatorios/`](docs/relatorios/). Um ficheiro por dia/assunto, sempre começados por
-"o que foi medido".
+## Decisões e histórico
 
-## Números de agora (medidos nesta caixa, Linux, sem JUCE)
+Produto PROD-01…PROD-10: pedidos explícitos registados. Fronteira D-AI-fora/A09/D-DEFER1/D47: conforme instrução do dono; desvios actuais identificados no documento.
+A folha D58–D66 do coordenador não foi adoptada integralmente. Port/fecho do PR #25 e arquivo do core-main não foram executados nem autorizados por esta limpeza.
 
-| | |
-|---|---|
-| Gate `ctest -L merge` | **15 testes, 0 falhas** |
-| Casos / verificações | **113 / 1456** |
-| Estado do audit de 2026-11-17 (31 itens) | **21 corrigidos** (1, 2, 3a, 3b, 4, 5, 7, 8, 10-15, 18, 22, 26, 27-31) · **10 em aberto** (6, 9, 16, 17, 19, 20, 21, 23, 24, 25) |
-
-O número de casos nunca desceu em nenhuma etapa de hoje: 88/1288 na triagem dos testes herdados → 104 → 111 →
-113.
-
-## O que está em aberto, em uma linha cada
-
-- **6** — o texto do item nunca me chegou; preciso dele para o verificar.
-- **9** — captura de estados de plugin aceita respostas com chaves em falta; falta `pluginStateKeys` no domínio
-  e a recusa na app. Política de timeout (5000 ms) é decisão tua.
-- **16, 17** — UI e som: "Core's own instruments" nos menus e "Randomize sound" activo sem nada para
-  randomizar. Com D46 ambos cheiram a mal colocados; não mexo sem o teu aval (D50).
-- **19, 20, 21, 23, 24, 25** — control / AICORE. A tua regra de hoje (AICORE fora do binário, é add-on) muda o
-  enquadramento: o verificador está a re-corres e separa o que é lado Core do que é lado AICORE.
-- **Windows não validado** — itens 7, 8, 15, 18, 27, 28, 31: código corrigido e compilado; nada correu. Há
-  um plano de teste para cada um no relatório.
-
-## Separação Core ↔ AICORE — clarificação do dono
-
-A referência é [docs/FRONTEIRA-CORE-AICORE.md](docs/FRONTEIRA-CORE-AICORE.md). Substitui a interpretação anterior de que toda a `core_control`, incluindo `bridge.cpp`, teria de permanecer no Core.
-
-Catálogo, validação tudo-ou-nada, transacção e Undo são do DAW. A bridge específica AICORE, painel/chat, modelo, chaves, conhecimento e memória pertencem ao pacote externo. A integração futura usa pipes locais, sem sockets/rede. A implementação actual usa ficheiros e ainda precisa de separação física; nada foi movido nesta tarefa.
-
-Leitura individual dos patterns: **45 JSON no total, 39 com proveniência AICORE e 6 com outras fontes**, todos `hypothesis`. A origem não autoriza apagar dados nem prova uma dependência em runtime; destino é decisão do dono.
-
-As referências D-AI-fora, A09/D-DEFER1 e D47 vêm da instrução actual do dono. A PR #4 não autoriza painel/memória no Core. O retorno da AI exige decisão numerada e gates verdes, incluindo Core sem pacote instalado.
-
-## Quem faz o quê
-
-Eu: itens abertos que não precisam de decisão, e as variantes do mesmo defeito que aparecem ao lado de cada
-item corrigido. Tu: decisões numeradas da secção 5 do relatório, o texto do item 6, e as decisões de implementação pendentes na fronteira Core ↔ AICORE (o documento já está escrito).
+Relatórios são históricos e ligados ao seu SHA; não substituir os seus números por resultados novos. Ao concluir trabalho, actualizar esta página e acrescentar relatório no [índice](docs/relatorios/README.md).

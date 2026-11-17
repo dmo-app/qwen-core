@@ -1,5 +1,7 @@
 # Plano: Core como DAW básica com plugins
 
+> **Referência histórica do snapshot indicado abaixo.** Direcção e pendências actuais: [ESTADO](../ESTADO.md) e [índice](README.md). Não constitui autorização para reintroduzir funcionalidades antigas.
+
 Atualizado a 2026-11-16. Base: o `main` em `d4c483c` (PR #3, depois do PR #2 `a8c0dcc`).
 
 ## A ideia

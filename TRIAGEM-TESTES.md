@@ -1,5 +1,7 @@
 # Triagem dos testes herdados — qwen-core (2026-11-17)
 
+> **Referência histórica do snapshot indicado abaixo.** Direcção e pendências actuais: [ESTADO](ESTADO.md) e [índice](docs/README.md). Não constitui autorização para reintroduzir funcionalidades antigas.
+
 Pedido do Diogo: "nao sigas a regra os testes ci anteriores pq o claude fez muita merda, nao se sabe o que realmente se aplica".
 Esta triagem decide o que se aplica. Medido no qwen-core@5d0b584, Linux, `cmake -DCMAKE_BUILD_TYPE=Release`, build limpo, 81/81.
 
