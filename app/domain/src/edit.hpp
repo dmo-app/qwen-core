@@ -152,6 +152,13 @@ std::string effectName(const json& fx);
 bool effectBypassed(const json& fx);
 double effectParam(const json& fx, const std::string& param, double fallback);
 const EffectInfo* findEffect(const std::string& name);
+// One entry per chain effect for the menus that list a chain (the track's right-click, Plugins > Master
+// effects). Every effect in the chain is offered, Core's own ones included: an old song or a template
+// carries them, and the menus listed the plugins only, so an own effect could never be removed from the
+// app (bug 2026-11-17). index: its place in the chain (removeEffect and setEffectBypass take the same);
+// window: a plugin effect with a window to open; label: the name shown.
+struct EffectMenuEntry { int index = 0; bool plugin = false; bool window = false; std::string label; };
+std::vector<EffectMenuEntry> effectMenuEntries(const json& chain);
 // Starting points of a Core Device for one style (GLITCH, PULSE): a name, a line on what it does, its values.
 // Every preset can be chosen in any style; the style only orders the menu. Unlisted knobs keep their default.
 struct EffectPreset {

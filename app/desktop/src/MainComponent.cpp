@@ -4553,15 +4553,19 @@ void MainComponent::showTrackMenu(const std::string& trackId) {
                      .setID(6).setEnabled(!snap_.missingPlugins.count(doc::pluginKey(trackId))));
   if (current) {
     juce::PopupMenu fxMenu;
-    for (size_t i = 0; i < current->effects.size() && i < 16; ++i) {
-      const nlohmann::json& fx = current->effects[i];
-      if (fx.value("type", std::string()) != "plugin" || !fx.contains("plugin")) continue;
-      const std::string key = doc::pluginKey(trackId, fx.value("id", std::string()));
+    // Every effect of the chain is listed, Core's own ones included (an old song or a template carries
+    // them): each gets On and Remove, so nothing in a chain is stuck (bug 2026-11-17). A window opens
+    // for a plugin only.
+    for (const auto& entry : doc::effectMenuEntries(current->effects)) {
+      const int i = entry.index;
       juce::PopupMenu one;
-      one.addItem(juce::PopupMenu::Item(u8("Open…")).setID(900 + (int)i).setEnabled(!snap_.missingPlugins.count(key)));
-      one.addItem(juce::PopupMenu::Item(u8("On")).setID(940 + (int)i).setTicked(!doc::effectBypassed(fx)));
-      one.addItem(juce::PopupMenu::Item(u8("Remove")).setID(920 + (int)i));
-      fxMenu.addSubMenu(u8(fx["plugin"].value("name", std::string("Plugin"))), one);
+      if (entry.window) {
+        const std::string key = doc::pluginKey(trackId, current->effects[(size_t)i].value("id", std::string()));
+        one.addItem(juce::PopupMenu::Item(u8("Open…")).setID(900 + i).setEnabled(!snap_.missingPlugins.count(key)));
+      }
+      one.addItem(juce::PopupMenu::Item(u8("On")).setID(940 + i).setTicked(!doc::effectBypassed(current->effects[(size_t)i])));
+      one.addItem(juce::PopupMenu::Item(u8("Remove")).setID(920 + i));
+      fxMenu.addSubMenu(u8(entry.label), one);
     }
     fxMenu.addSeparator();
     fxMenu.addSubMenu(u8("Add a plugin effect"), byVendor(pluginFx, 4000, [](const nlohmann::json&) { return false; }));
@@ -5209,18 +5213,22 @@ juce::PopupMenu MainComponent::getMenuForIndex(int index, const juce::String&) {
                           juce::String((int)plugins_->effects().size()) + u8(" effects"));
     for (const auto& f : plugins_->folders()) menu.addItem(juce::PopupMenu::Item(f).setEnabled(false));
     menu.addSeparator();
-    // The master's plugin effects (after the master volume): open, on/off, remove, add.
+    // The master's effects (after the master volume): open, on/off, remove, add. Every effect of the chain
+    // is listed, Core's own ones included (an old song or a template carries them), each with Remove, so
+    // nothing on the master is stuck (bug 2026-11-17). A window opens for a plugin only.
     {
       const auto& chain = history_.current().masterEffects;
       juce::PopupMenu master;
-      for (size_t i = 0; i < chain.size() && i < 16; ++i) {
-        const nlohmann::json& fx = chain[i];
-        if (fx.value("type", std::string()) != "plugin" || !fx.contains("plugin")) continue;
+      for (const auto& entry : doc::effectMenuEntries(chain)) {
+        const int i = entry.index;
         juce::PopupMenu one;
-        one.addItem(juce::PopupMenu::Item(u8("Open…")).setID(kMasterFx + (int)i));
-        one.addItem(juce::PopupMenu::Item(u8("On")).setID(kMasterFx + 40 + (int)i).setTicked(!doc::effectBypassed(fx)));
-        one.addItem(juce::PopupMenu::Item(u8("Remove")).setID(kMasterFx + 20 + (int)i));
-        master.addSubMenu(u8(fx["plugin"].value("name", std::string("Plugin"))), one);
+        if (entry.window) {
+          const std::string key = doc::pluginKey("", chain[(size_t)i].value("id", std::string()));
+          one.addItem(juce::PopupMenu::Item(u8("Open…")).setID(kMasterFx + i).setEnabled(!snap_.missingPlugins.count(key)));
+        }
+        one.addItem(juce::PopupMenu::Item(u8("On")).setID(kMasterFx + 40 + i).setTicked(!doc::effectBypassed(chain[(size_t)i])));
+        one.addItem(juce::PopupMenu::Item(u8("Remove")).setID(kMasterFx + 20 + i));
+        master.addSubMenu(u8(entry.label), one);
       }
       const auto effects = plugins_->effects();
       juce::PopupMenu add;
