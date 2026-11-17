@@ -2,10 +2,11 @@
 
 > **DIRECÇÃO ACTUAL: PATTERN MAKER + TOOLS.**
 > Manter catálogo de padrões e alinhamento kick/baixo/pratos. Tools agrupam plugins externos em chains, com parâmetros aplicados a pistas/partes ou compassos inicial/final.
-> Retirar instrumentos/efeitos próprios, D-Core/F-Core e restantes módulos antigos, samples antigos distribuídos e menus redundantes. Não apagar áudio do utilizador.
+> Tools: explorar painéis simplificados, com acesso directo ao editor de cada plugin usado na chain. Formatos de plugins: arquitectura extensível; VST3 é o suporte auditado, não o limite do produto.
+> Retirar Kick Design, Cymbal Design, instrumentos/efeitos próprios, D-Core/F-Core e restantes módulos antigos, samples antigos distribuídos e menus redundantes. Não apagar áudio do utilizador.
 > [Direcção e plano de limpeza](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md).
 
-DAW desktop leve, fiável e fácil de usar, centrado em plugins VST3 e áudio importado/gravado. Windows 11 x64 é P0; uso privado, local-only, sem subscrição.
+DAW desktop leve, fiável e fácil de usar, centrado em plugins externos e áudio importado/gravado. Windows 11 x64 é P0; uso privado, local-only, sem subscrição.
 
 > **AI FORA DO CORE POR AGORA.**
 > O Core é o DAW; o AICORE é o laboratório. Modelo, chaves, conhecimento, memória de receitas/SQLite, chats e JSONL pertencem ao futuro pacote externo, nunca ao Core.exe.

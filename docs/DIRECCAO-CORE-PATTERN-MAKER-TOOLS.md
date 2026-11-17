@@ -6,7 +6,7 @@
 > Preservar o catálogo de padrões e o alinhamento de pratos com kick/baixo.
 > Retirar instrumentos/efeitos próprios, os antigos módulos “*-Core”, os samples antigos distribuídos e a complexidade dos menus.
 
-Este documento regista a clarificação do dono nesta conversa. É documentação e plano; não declara limpeza implementada. Não ratifica em bloco a folha D58–D66 sugerida pelo coordenador. Os IDs **PROD-01…PROD-07** abaixo servem para rastrear esta instrução explícita, sem ocupar ou renumerar decisões D do ledger.
+Este documento regista a clarificação do dono nesta conversa. É documentação e plano; não declara limpeza implementada. Não ratifica em bloco a folha D58–D66 sugerida pelo coordenador. Os IDs **PROD-01…PROD-10** abaixo servem para rastrear esta instrução explícita, sem ocupar ou renumerar decisões D do ledger.
 
 A fronteira de processos, memória e AI continua definida em [FRONTEIRA-CORE-AICORE.md](FRONTEIRA-CORE-AICORE.md). AI permanece diferida; Pattern Maker e Tools têm de funcionar manualmente sem modelo, pacote AI ou AICORE.
 
@@ -17,6 +17,7 @@ A fronteira de processos, memória e AI continua definida em [FRONTEIRA-CORE-AIC
 Tools são funções de criação musical que configuram e agrupam plugins externos numa chain e controlam os parâmetros relevantes para criar um momento/efeito musical.
 
 O utilizador define:
+
 - as pistas ou partes das pistas afectadas;
 - um intervalo seleccionado, ou início/fim em compassos;
 - os plugins da chain, a sua ordem e os parâmetros que a tool deve controlar.
@@ -34,6 +35,7 @@ O percurso pattern → arrangement continua parte do workflow. O nome de produto
 ### PROD-03 — preservar catálogo e alinhamento
 
 Manter:
+
 - o catálogo de padrões existente;
 - as variações e receitas rítmicas úteis, incluindo KBBB/rolls;
 - a capacidade de alinhar pratos com baixo e kick;
@@ -49,7 +51,7 @@ Preservar o comportamento musical útil não exige conservar nomes, classes ou p
 
 Retirar da oferta do produto os instrumentos e efeitos criativos próprios e todos os módulos “*-Core” como superfícies autónomas, incluindo **D-Core e F-Core**, e os restantes equivalentes.
 
-Só ficam **Pattern Maker e Tools** como ferramentas criativas próprias do Core. Isto não remove o DAW: transporte, arrangement, mixer, hosting VST3, automação, routing, buses, gravação, import/export, persistência e recuperação continuam necessários.
+Só ficam **Pattern Maker e Tools** como ferramentas criativas próprias do Core. Isto não remove o DAW: transporte, arrangement, mixer, hosting de plugins externos (VST3 no estado auditado; extensível a outros formatos), automação, routing, buses, gravação, import/export, persistência e recuperação continuam necessários.
 
 Gain, pan, metering, resampling e protecção de saída permanecem infraestrutura do host.
 
@@ -81,7 +83,7 @@ Objectivo: uma operação deve ter um lugar primário claro, poucos passos e pro
 | Estado indisponível | Distinguir plugin em falta, acção incompatível e legado silencioso; sem opção aparentemente activa que não faz nada |
 | AI | Não obrigatória nem reactivada por esta reorganização |
 
-Não transformar a limpeza numa nova coleção de painéis. Não portar integralmente UI antiga ou PR antigo por inércia; comparar cada alteração com esta direcção e aproveitar apenas o que a serve. Não importar a proposta D58 de F-Core como superfície autónoma.
+Os painéis de Tools são agora um âmbito explícito de exploração pedido pelo dono (PROD-08). Devem simplificar tarefas e manter-se dentro de Tools, sem reconstruir a antiga coleção de módulos autónomos. O desenho final ainda não está decidido. Não portar integralmente UI antiga ou PR antigo por inércia; comparar cada alteração com esta direcção e aproveitar apenas o que a serve. Não importar a proposta D58 de F-Core como superfície autónoma.
 
 ## 4. PROD-07 — execução posterior com preservação
 
@@ -99,7 +101,10 @@ Cada conjunto deve deixar um Core utilizável. Não substituir testes de regress
 
 ### Critérios de aceitação
 
-- Apenas Pattern Maker e Tools aparecem como ferramentas criativas próprias.
+- Apenas Pattern Maker e Tools aparecem como ferramentas criativas próprias; Kick Design e Cymbal Design não são oferecidos.
+- O painel de Tools permite abrir directamente o editor de cada instância usada na chain, sem a recriar.
+- Os painéis simplificam o percurso sem impedir acesso aos parâmetros completos dos plugins.
+- Formatos adicionais têm estado de suporte e testes explícitos; VST3 não é um limite permanente do produto.
 - Nenhum menu oferece um instrumento/efeito criativo interno como se produzisse som.
 - Tools actuam nas pistas/partes e nos compassos indicados, com chain externa e parâmetros identificáveis.
 - Pattern Maker usa pistas existentes e preserva o catálogo; não depende dos samples antigos.
@@ -110,12 +115,58 @@ Cada conjunto deve deixar um Core utilizável. Não substituir testes de regress
 - Core continua a funcionar sem AI.
 - Windows/áudio/export só são declarados validados depois de execução registada.
 
-## 5. Pontos técnicos ainda a fechar
+## 5. Clarificações adicionais do dono
+
+### PROD-08 — explorar painéis simplificados de Tools
+
+**A forma final de Tools ainda está por explorar.** A descrição funcional anterior não fecha o desenho da interface nem exige que o utilizador construa manualmente toda a chain em cada utilização.
+
+Investigar painéis que simplifiquem o percurso: escolher o momento/efeito pretendido, indicar pistas/partes e intervalo em compassos, usar uma chain de plugins externos e ajustar os parâmetros relevantes. Mostrar primeiro poucos controlos claros; permitir aprofundar parâmetros, ordem e routing quando necessário. Presets/receitas e mapeamentos são possibilidades a estudar, não uma interface já implementada ou aprovada.
+
+**Acesso directo aos plugins, por pedido explícito do dono:** o painel deve mostrar os plugins usados na chain e permitir abrir o editor de cada um a partir da própria entrada. Tem de abrir a instância exacta que está nessa chain, não outra instância do mesmo plugin nem uma cópia nova. Fechar e reabrir o editor não deve recriar o plugin ou repor os parâmetros.
+
+Os controlos simplificados não substituem o editor completo. A relação entre macros da Tool, parâmetros do plugin e automação deve ser visível e coerente; definir como são tratadas alterações manuais em parâmetros automatizados, sem valores divergentes ou sobrescritas silenciosas. Se o plugin estiver ausente ou não disponibilizar editor, comunicar a situação e o percurso de parâmetros disponível, sem oferecer um botão que parece funcionar e não faz nada.
+
+Estudo posterior esperado:
+- comparar esboços de painéis sobre tarefas reais, não apenas estética;
+- explicar o que cada painel controla e quais plugins/instâncias altera;
+- demonstrar selecção de pistas e início/fim em compassos;
+- demonstrar abertura directa de cada editor e retorno ao painel sem perder contexto;
+- comparar passos/cliques e quantidade de controlos visíveis;
+- preservar acesso à profundidade e ao Undo;
+- apresentar o desenho ao dono antes de o implementar.
+
+Este estudo fica registado para desenvolvimento e explicação futuros. Não há mockup final nem painel novo implementado nesta entrega.
+
+### PROD-09 — retirar Kick Design e Cymbal Design
+
+**Kick Design e Cymbal Design entram explicitamente na remoção dos instrumentos/designers próprios.** A criação sonora de kicks e pratos é feita nos plugins externos que o utilizador instala.
+
+Retirar essas ofertas dos painéis, menus, atalhos e conteúdo distribuído que as apresente como instrumentos/designers do Core; inventariar dependências antes de remover código. Não basta mudar-lhes o nome para Tools e conservar síntese/DSP criativo próprio.
+
+Isto não remove a criação de padrões de kick/pratos, o alinhamento de pratos com kick/baixo, nem a possibilidade de abrir e configurar plugins externos a partir de Tools. São funções diferentes: organizar eventos musicais fica no Core; gerar o timbre criativo pertence ao plugin.
+
+O pedido confirma a intenção de remoção; a presença e os caminhos exactos de todos os designers no snapshot actual ainda precisam do inventário de implementação. Não declarar remoção concluída nesta tarefa documental.
+
+### PROD-10 — plugins externos sem limitar o produto a VST3
+
+**A direcção do produto é adaptar-se a diferentes tipos e formatos de plugins externos, não ser exclusivamente VST3.** A referência a VST3 descreve o suporte identificado na auditoria, não um limite permanente da finalidade do Core.
+
+Tools e Pattern Maker devem trabalhar com as capacidades necessárias — instrumentos, efeitos, parâmetros, estado, automação, entradas/saídas e editor quando disponível — sem tornar o workflow musical dependente do nome de um formato. O hosting deve poder ser ampliado através de adaptações por formato, preservando identidade de instância, estado, timing e recuperação.
+
+“Todo tipo de plugin” é o objectivo de abrangência, **não uma promessa de compatibilidade universal já entregue**. Cada formato e plugin precisa de verificação das capacidades, plataforma, requisitos de distribuição/licenciamento e testes; Windows 11 x64 continua P0. Não afirmar que um formato é utilizável numa plataforma sem o verificar.
+
+Antes de implementar suporte adicional, preparar uma matriz com: formato/plataforma, estado de suporte, scan, carregamento, editor, parâmetros/automação, estado/save/reopen, routing/latência e recuperação. Identificar claramente suportado, parcial, planeado e não verificado. Nenhum novo SDK/backend foi adicionado nesta entrega.
+
+## 6. Pontos técnicos ainda a fechar
 
 A direcção de produto acima está decidida pelo pedido do dono. Não voltar a perguntar se D-Core/F-Core devem continuar como módulos.
 
 Antes de implementar, falta concretizar:
-- o inventário exacto de samples/recursos legados a retirar do pacote;
+
+- o desenho dos painéis simplificados de Tools e a relação macro/automação/editor de cada instância;
+- a matriz e prioridade de formatos de plugins a suportar para além de VST3;
+- o inventário exacto de Kick Design/Cymbal Design e samples/recursos legados a retirar do pacote;
 - quais receitas antigas sobrevivem em Tools e o mapeamento dos seus parâmetros para plugins externos;
 - a semântica dos limites temporais: curvas e caudas após o fim, restauração de parâmetros e várias tools sobre a mesma instância;
 - o tratamento de projectos antigos sem o plugin substituto instalado.

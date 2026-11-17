@@ -1,6 +1,7 @@
 # ESTADO do Core — qwen-core
 
 > **Nova clarificação do dono:** ficam apenas **Pattern Maker e Tools** como ferramentas criativas próprias.
+> **Tools por explorar:** painéis simplificados com abertura directa do editor de cada instância da chain. Remover Kick Design/Cymbal Design. Suporte de plugins extensível a vários formatos; não prometer compatibilidade universal já entregue.
 > Preservar catálogo de padrões e alinhamento de pratos/kick/baixo; som por plugins externos. Retirar módulos antigos, samples distribuídos e menus redundantes.
 > [Direcção e plano de limpeza](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md). **Documentado; ainda não implementado.**
 

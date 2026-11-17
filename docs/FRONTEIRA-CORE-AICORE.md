@@ -37,7 +37,7 @@ Ordem para esta matéria: instrução actual do dono → esta fronteira → desc
 
 DAW desktop leve, fiável e fácil de usar para música electrónica underground, em particular psycore, slambient e hitech. Windows 11 x64 é P0; uso privado, local-only, sem subscrição.
 
-O som criativo vem de VST3 e áudio importado/gravado. O Core garante transporte, precisão temporal, comportamento real-time previsível, baixa latência, CPU/RAM eficientes, render consistente, hosting, automação, routing, persistência e recuperação. Gain, pan, metering, resampling e protecção de saída são DSP infraestrutural permitido.
+O som criativo vem de plugins externos e áudio importado/gravado. VST3 é o suporte identificado no snapshot auditado; a direcção do produto é extensível a outros tipos/formatos, cuja compatibilidade terá de ser verificada. Kick Design e Cymbal Design são explicitamente retirados da oferta própria; os painéis de Tools ainda serão explorados, com acesso directo ao editor de cada plugin da chain (PROD-08…PROD-10 em [direcção do produto](DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md)). O Core garante transporte, precisão temporal, comportamento real-time previsível, baixa latência, CPU/RAM eficientes, render consistente, hosting, automação, routing, persistência e recuperação. Gain, pan, metering, resampling e protecção de saída são DSP infraestrutural permitido.
 
 Pattern Maker e Tools escrevem dados musicais e orquestram plugins; não constituem instrumentos/efeitos próprios. KBB/rolls, alinhamento, build-ups e operações úteis por papéis podem sobreviver dentro dessas duas ferramentas, sem manter D-Core/F-Core ou outros módulos autónomos. Exportar pistas/stems do projecto é uma operação do DAW; **separar uma mistura em stems por AI** é trabalho do AICORE.
 
