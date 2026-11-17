@@ -1,5 +1,10 @@
 # Relatório — audit "ARREDURA PROFUNDA DO CORE", 2026-11-17
 
+> **Clarificação posterior do dono (17-11-2026):** a arquitectura aplicável está em [FRONTEIRA-CORE-AICORE.md](../FRONTEIRA-CORE-AICORE.md).
+> A frase da secção 5.1 “isso tem de ficar no Core” **não autoriza manter bridge.cpp/painel/memória no binário**: só catálogo musical, validação integral, transacção e Undo ficam do lado DAW. AI continua diferida.
+> O inventário posterior encontrou 45 patterns no total, **39 com origem AICORE e 6 de outras fontes**.
+> O relato e as medições abaixo são preservados como histórico; esta nota não declara novo teste verde nem alteração de código.
+
 Repo: `dmo-app/qwen-core`, rama `main`. Este ficheiro é o registo do que foi feito, do que foi medido, e do
 que ficou por resolver. A página [`ESTADO.md`](../../ESTADO.md) aponta para aqui, e
 [`2026-11-17-RESUMO.md`](2026-11-17-RESUMO.md) é a versão de cinco minutos.
