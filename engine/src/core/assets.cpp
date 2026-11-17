@@ -13,7 +13,22 @@ std::shared_ptr<const AudioData> AssetStore::get(const std::string& path, double
   const auto size = std::filesystem::file_size(p, e);
   const auto time = std::filesystem::last_write_time(p, e).time_since_epoch().count();
   const std::string key = path + "|" + std::to_string(sampleRate) + "|" + std::to_string(e ? 0 : size) + "|" + std::to_string(e ? 0 : time);
-  if (auto it = files_.find(key); it != files_.end()) return it->second;
+  if (auto it = files_.find(key); it != files_.end()) {
+    // The same size and the same date are not the same audio: a file written again in place has both (audit
+    // 2026-11-17, #3b). Only the header is read here, once per graph build and never per audio block; when it
+    // says something else than what is cached, the entry goes and the file is read again.
+    WavInfo head;
+    std::string why;
+    bool stale = false;
+    if (wavInfo(path, &head, &why) && head.frames > 0 && head.sampleRate > 0) {
+      // What the cached buffer would have to be, with the same rounding resample uses.
+      const double exact = (double)head.frames * sampleRate / head.sampleRate;
+      const int64_t atSongRate = (int64_t)std::ceil(exact - exact * 1e-12);
+      stale = head.channels != it->second->channels || atSongRate != it->second->frames();
+    }
+    if (!stale) return it->second;
+    files_.erase(it);
+  }
   try {
     size_t used = 0;
     for (const auto& [k, data] : files_) used += data->bytes();

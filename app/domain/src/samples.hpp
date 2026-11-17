@@ -54,6 +54,9 @@ struct LibrarySample {
   std::string pack;        // the first folder (the sample pack)
   std::string sha256;
   int64_t size = 0, mtime = 0;
+  // The hash of its first 64 KiB (audit 2026-11-17, #3a): size and mtime do not say a file was written again
+  // with the same length at the same second, this does, and it costs one short read instead of the whole file.
+  std::string headSha256;
   double seconds = 0, sampleRate = 0;
   int channels = 0;
   int duplicates = 0;      // other files with the same content (one entry: the first path)

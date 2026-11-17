@@ -200,14 +200,20 @@ int findRoleEffect(const Document& doc, const std::string& trackId, const std::s
   return -1;
 }
 
-std::string ensureRoleEffect(Document& doc, const std::string& trackId, const std::string& role, const RoleMap& map) {
+int roleEffectSlot(const Document& doc, const std::string& trackId, const std::string& role, const RoleMap& map) {
   const RoleBinding& b = bindingFor(map, role, false);
-  json& chain = effectChain(doc, trackId);
+  const json& chain = effectChain(doc, trackId);
   int at = findRoleEffect(doc, trackId, role);
   if (at < 0)  // the same plugin put there by hand plays the role too
     for (size_t i = 0; i < chain.size(); ++i)
       if (chain[i].is_object() && chain[i].value("type", std::string()) == "plugin" && !chain[i].contains("role") &&
           samePlugin(chain[i].value("plugin", json::object()), b.plugin)) { at = (int)i; break; }
+  return at;  // -1: playing this role takes a new slot on the chain
+}
+
+std::string ensureRoleEffect(Document& doc, const std::string& trackId, const std::string& role, const RoleMap& map) {
+  const RoleBinding& b = bindingFor(map, role, false);
+  int at = roleEffectSlot(doc, trackId, role, map);
   if (at < 0) at = addPluginEffect(doc, trackId, b.plugin);
   json& fx = effectChain(doc, trackId)[(size_t)at];
   fx["role"] = role;

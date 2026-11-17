@@ -154,6 +154,7 @@ MidiFile parseMidi(const std::vector<uint8_t>& bytes) {
   r.at = headerEnd;
   MidiFile f;
   f.ppq = division;
+  int read = 0;  // the MTrk chunks really read (an unknown chunk is not one, and the file can run short)
   for (int i = 0; i < count && r.at + 8 <= bytes.size(); ++i) {
     const bool isTrack = bytes[r.at] == 'M' && bytes[r.at + 1] == 'T' && bytes[r.at + 2] == 'r' && bytes[r.at + 3] == 'k';
     r.at += 4;
@@ -163,11 +164,17 @@ MidiFile parseMidi(const std::vector<uint8_t>& bytes) {
     if (isTrack) {
       Reader tr{bytes, r.at, next};
       readTrack(tr, f.tracks, f.tempos, format == 0);
+      ++read;
     } else {
       --i;  // an unknown chunk does not count as a track
     }
     r.at = next;
   }
+  // A file whose header promises more tracks than its bytes hold is cut short: say so, do not hand back a
+  // shorter list as if it were the whole song (audit 2026-11-17, #2; midi.hpp promises DocumentError).
+  // The tracks that play no notes are dropped below, so it is the chunks that are counted, not f.tracks.
+  if (read < count)
+    throw DocumentError("midi", "the file is cut short: " + std::to_string(read) + " of " + std::to_string(count) + " tracks");
   std::stable_sort(f.tempos.begin(), f.tempos.end(), [](const MidiTempo& a, const MidiTempo& b) { return a.tick < b.tick; });
   // Only the tracks that play notes (the tempo track, lyrics, empty ones go).
   f.tracks.erase(std::remove_if(f.tracks.begin(), f.tracks.end(), [](const MidiTrack& t) { return t.notes.empty(); }), f.tracks.end());

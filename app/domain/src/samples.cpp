@@ -233,6 +233,21 @@ double levelFor(const LibrarySample& sample, const std::string& role) {
   return std::round(std::clamp(level, -24.0, 24.0) * 10) / 10;
 }
 
+namespace {
+// The hash of the first 64 KiB of a file: one short read that says whether the bytes are still the ones a
+// previous scan measured (audit 2026-11-17, #3a: the same length and the same date are not the same file).
+// "" when the file cannot be read: the caller then reads it the long way and reports what is wrong with it.
+constexpr size_t kSampleHeadBytes = 64 * 1024;
+std::string headSha256Of(const fs::path& file) {
+  std::ifstream in(file, std::ios::binary);
+  if (!in) return "";
+  std::vector<char> buf(kSampleHeadBytes);
+  in.read(buf.data(), (std::streamsize)kSampleHeadBytes);
+  buf.resize((size_t)std::max<std::streamsize>(0, in.gcount()));
+  return sha256Hex(buf.data(), buf.size());
+}
+}  // namespace
+
 LibrarySample describeSample(const fs::path& file, const fs::path& root) {
   LibrarySample s;
   std::error_code e;
@@ -245,6 +260,7 @@ LibrarySample describeSample(const fs::path& file, const fs::path& root) {
   s.pack = s.path.find('/') == std::string::npos ? "" : s.path.substr(0, s.path.find('/'));
   s.size = (int64_t)fs::file_size(file, e);
   s.mtime = (int64_t)fs::last_write_time(file, e).time_since_epoch().count();
+  s.headSha256 = headSha256Of(file);
   const WavInfo w = readWavInfo(file);
   s.sampleRate = w.sampleRate;
   s.channels = w.channels;
@@ -309,13 +325,23 @@ SampleIndex scanLibrary(const fs::path& root, const SampleIndex* previous, const
     const int64_t size = (int64_t)fs::file_size(f, fe);
     const int64_t mtime = (int64_t)fs::last_write_time(f, fe).time_since_epoch().count();
     auto old = before.find(utf8(f));
+    bool kept = false;  // the registration of the last scan, still good for these bytes
     if (old != before.end() && old->second->size == size && old->second->mtime == mtime && !old->second->sha256.empty() &&
         old->second->loudDb > kNotMeasured + 1) {
-      s = *old->second;  // unchanged: what was read before
-      s.duplicates = 0;
-      s.otherPaths.clear();
-      if (!s.embedded.is_object()) s.embedded = fileMetadata(f, s.sampleRate);  // indexed by an older Core
-    } else {
+      const std::string head = headSha256Of(f);
+      // The size and the date are not enough: a file written again in place has both (audit 2026-11-17, #3a),
+      // and only its first bytes say so. An index from an older Core has no head hash yet: take the file as it
+      // stands, remember its head now, and do not re-measure the whole library for one scan.
+      if (!head.empty() && (old->second->headSha256.empty() || old->second->headSha256 == head)) {
+        s = *old->second;  // unchanged: what was read before
+        s.headSha256 = head;
+        s.duplicates = 0;
+        s.otherPaths.clear();
+        if (!s.embedded.is_object()) s.embedded = fileMetadata(f, s.sampleRate);  // indexed by an older Core
+        kept = true;
+      }
+    }
+    if (!kept) {
       try {
         s = describeSample(f, root);
         // A file that moved (by hand): same content, so its measurements still hold.
@@ -370,6 +396,7 @@ json indexToJson(const SampleIndex& index) {
   json samples = json::array();
   for (const auto& s : index.samples)
     samples.push_back({{"file", s.file}, {"path", s.path}, {"sha256", s.sha256}, {"size", s.size}, {"mtime", s.mtime},
+                       {"headSha256", s.headSha256},
                        {"seconds", s.seconds}, {"sampleRate", s.sampleRate}, {"channels", s.channels}, {"duplicates", s.duplicates},
                        {"peakDb", s.peakDb}, {"loudDb", s.loudDb}, {"otherPaths", s.otherPaths},
                        {"sidecar", s.sidecar.is_object() ? s.sidecar : json(nullptr)},
@@ -400,6 +427,7 @@ SampleIndex indexFromJson(const json& v) {
       s.path = j.at("path").get<std::string>();
       s.sha256 = j.at("sha256").get<std::string>();
       s.size = j.value("size", (int64_t)0); s.mtime = j.value("mtime", (int64_t)0);
+      s.headSha256 = j.value("headSha256", std::string());  // an index from an older Core: hashed at the next scan
       s.seconds = j.value("seconds", 0.0); s.sampleRate = j.value("sampleRate", 0.0); s.channels = j.value("channels", 0);
       s.duplicates = j.value("duplicates", 0);
       s.peakDb = j.value("peakDb", kNotMeasured); s.loudDb = j.value("loudDb", kNotMeasured);  // older indexes: measured at the next scan

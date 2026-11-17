@@ -228,10 +228,32 @@ std::string mainPatternIn(const Track& t, int64_t a, int64_t b) {
   return best;
 }
 
-std::string newPattern(Track& t, const std::string& name, int64_t length, std::vector<Note> notes) {
+// A pattern name the document reader takes back: it refuses a pattern whose "name" is over 40 bytes
+// (document.cpp: p.name = pr.string("name", p.id, 40)), so Save and the autosave failed on a song the app
+// had just accepted (audit 2026-11-17, #1: "Groove second roll (triplet)" is 59 bytes). The cut never splits
+// a UTF-8 character (the same rule as cutUtf8 in edit.cpp), and the suffix stays whole: it is what tells the
+// patterns of one section apart, and isFill() reads the word "fill" out of it.
+constexpr size_t kMaxPatternNameBytes = 40;
+
+std::string cutUtf8(const std::string& s, size_t max) {
+  if (s.size() <= max) return s;
+  while (max > 0 && ((unsigned char)s[max] & 0xC0) == 0x80) --max;
+  return s.substr(0, max);
+}
+
+std::string patternName(const std::string& head, const std::string& suffix) {
+  if (suffix.size() >= kMaxPatternNameBytes) {  // a suffix that is the name on its own keeps its tail
+    std::string tail = suffix.substr(suffix.size() - kMaxPatternNameBytes);
+    while (!tail.empty() && ((unsigned char)tail[0] & 0xC0) == 0x80) tail.erase(0, 1);
+    return tail;
+  }
+  return cutUtf8(head, kMaxPatternNameBytes - suffix.size()) + suffix;
+}
+
+std::string newPattern(Track& t, const std::string& head, const std::string& suffix, int64_t length, std::vector<Note> notes) {
   const std::string id = addPattern(t, length);
   Pattern& p = patternById(t, id);
-  p.name = name.substr(0, 80);
+  p.name = patternName(head, suffix);
   std::sort(notes.begin(), notes.end(), [](const Note& x, const Note& y) { return x.tick != y.tick ? x.tick < y.tick : x.pitch < y.pitch; });
   for (size_t i = 0; i < notes.size(); ++i) notes[i].id = "n" + std::to_string(i + 1);
   p.notes = std::move(notes);
@@ -341,7 +363,7 @@ static void retimeBass(Track& t, int64_t a, int64_t b, double ratio, std::vector
       std::string name = src.name;
       const size_t at = name.rfind(" @ ");
       if (at != std::string::npos && name.size() > 4 && name.compare(name.size() - 4, 4, " BPM") == 0) name.erase(at);
-      const std::string id = newPattern(t, name + " @ " + fmt(60000.0 / (newMs * kPpq), "BPM"), src.lengthTicks, notes);
+      const std::string id = newPattern(t, name, " @ " + fmt(60000.0 / (newMs * kPpq), "BPM"), src.lengthTicks, notes);
       it = copies.emplace(c.patternId, id).first;
     }
     c.patternId = it->second;
@@ -484,7 +506,7 @@ std::vector<std::string> randomizeStyle(Document& doc, const RandomizeOptions& o
           for (const auto& n : notes) has15 |= n.tick % BAR == 15 * S16;
           // Only ghosts inside the pattern: a 1.5-bar kick put one past its end and the song never opened again (sweep P1).
           if (!has15) for (int64_t bar = 0; bar + 15 * S16 < src.lengthTicks; bar += BAR) notes.push_back(note(bar + 15 * S16, std::min(len, S16), pitch, 0.45));
-          groove = newPattern(*kick, src.name + " + ghost", src.lengthTicks, notes);
+          groove = newPattern(*kick, src.name, " + ghost", src.lengthTicks, notes);
           did.push_back("ghost kick");
         }
         int64_t to = cov.to;
@@ -535,7 +557,7 @@ std::vector<std::string> randomizeStyle(Document& doc, const RandomizeOptions& o
           for (size_t beat = 0; beat < pitches.size(); ++beat)
             for (size_t k = 0; k < offs.size(); ++k)
               notes.push_back(note((int64_t)beat * kPpq + offs[k], gate, root + pitches[beat], vel[k % vel.size()]));
-          return newPattern(*bass, sec.name + " " + name + " (" + g + ")", 16 * kPpq, notes);
+          return newPattern(*bass, sec.name, " " + name + " (" + g + ")", 16 * kPpq, notes);
         };
         std::vector<int> plain(16, 0), withTurn(12, 0);
         withTurn.insert(withTurn.end(), turn.begin(), turn.end());
@@ -591,7 +613,7 @@ std::vector<std::string> randomizeStyle(Document& doc, const RandomizeOptions& o
           }
           std::string rollText;
           for (int s : rolls) rollText += (rollText.empty() ? "" : "/") + std::to_string(s + 1);
-          groove = newPattern(*hats, sec.name + " " + grid + (rolls.empty() ? "" : " + rolls"), BAR, notes);
+          groove = newPattern(*hats, sec.name, " " + grid + (rolls.empty() ? "" : " + rolls"), BAR, notes);
           did.push_back("hats " + grid + (rolls.empty() ? "" : ", rolls on 16th " + rollText + " x" + std::to_string(count)));
         }
         std::string fill = hadFill ? hatFill : "";
@@ -603,7 +625,7 @@ std::vector<std::string> randomizeStyle(Document& doc, const RandomizeOptions& o
             if (roll) { n.length = S16; n.hasRoll = true; n.roll.count = fillStyle == "ratchet" ? 3 : 4; n.roll.velocityFrom = 0.3; n.roll.velocityTo = 0.75; }
             notes.push_back(n);
           }
-          fill = newPattern(*hats, sec.name + " fill (" + fillStyle + ")", BAR, notes);
+          fill = newPattern(*hats, sec.name, " fill (" + fillStyle + ")", BAR, notes);
           did.push_back("hat fills " + fillStyle);
         }
         int64_t to = cov.to;

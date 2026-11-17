@@ -782,11 +782,21 @@ std::string duplicateSection(Document& doc, const std::string& sectionId) {
   const int64_t start = original.startTick, len = original.lengthTicks, end = start + len;
   if (doc.lengthTicks + len > 4096LL * 4 * kPpq) throw DocumentError("lengthTicks", "the song would be too long");
   if (doc.sections.size() >= 64) throw DocumentError("sections", "the song has the maximum of 64 sections");
-  splitClipsAt(doc, start);
-  splitClipsAt(doc, end);
-  splitAutomationAt(doc, start);
-  splitAutomationAt(doc, end);
-  for (auto* list : automationLists(doc))
+  // The section's tempo changes go with its music (audit 2026-11-17, #4: they did not, and a duplicated section
+  // lost the tempo Randomize axis J wrote for it). Decided here, before anything moves.
+  std::vector<TempoPoint> tempoCopies;
+  for (const auto& p : doc.tempoMap)
+    if (p.tick >= start && p.tick < end) tempoCopies.push_back({p.tick + len, p.bpm, p.extra, p.ramp});
+  if (doc.tempoMap.size() + tempoCopies.size() > (size_t)kMaxTempoPoints)
+    throw DocumentError("tempoMap", "at most " + std::to_string(kMaxTempoPoints) + " tempo changes");
+  // All or nothing (the same discipline as importMidi): a track over its 256 clips used to leave the automation,
+  // the tempo map and the earlier tracks already moved.
+  Document next = doc;
+  splitClipsAt(next, start);
+  splitClipsAt(next, end);
+  splitAutomationAt(next, start);
+  splitAutomationAt(next, end);
+  for (auto* list : automationLists(next))
     for (auto& a : *list) {
       std::vector<AutomationPoint> copies;
       for (auto& p : a.points) {
@@ -797,8 +807,8 @@ std::string duplicateSection(Document& doc, const std::string& sectionId) {
       // with the section's start value.
       a.points.insert(a.points.end(), copies.begin(), copies.end());
     }
-  sortAutomation(doc);
-  for (auto& t : doc.tracks) {
+  sortAutomation(next);
+  for (auto& t : next.tracks) {
     std::vector<Clip> copies;
     for (auto& c : t.clips) {
       if (c.startTick >= end) c.startTick += len;
@@ -815,14 +825,17 @@ std::string duplicateSection(Document& doc, const std::string& sectionId) {
     if (t.audioClips.size() + audioCopies.size() > 1024) throw DocumentError("audioClips", "a track would pass 1024 audio clips");
     for (auto& c : audioCopies) { c.id = nextId(t.audioClips, "x"); t.audioClips.push_back(c); }
   }
-  for (auto& s : doc.sections) if (s.startTick >= end) s.startTick += len;
-  // Match the inserted time: later tempo changes must follow the later music.
-  for (auto& p : doc.tempoMap) if (p.tick >= end) p.tick += len;
-  if (doc.loop.startTick >= end) { doc.loop.startTick += len; doc.loop.endTick += len; }
-  doc.lengthTicks += len;
-  Section copy{nextId(doc.sections, "s"), (original.name + " 2").substr(0, 40), end, len, json::object(), original.color};
-  doc.sections.push_back(copy);
-  sortSections(doc);
+  for (auto& s : next.sections) if (s.startTick >= end) s.startTick += len;
+  // Match the inserted time: later tempo changes follow the later music, and the section's own ones are copied.
+  for (auto& p : next.tempoMap) if (p.tick >= end) p.tick += len;
+  next.tempoMap.insert(next.tempoMap.end(), tempoCopies.begin(), tempoCopies.end());
+  std::sort(next.tempoMap.begin(), next.tempoMap.end(), [](const TempoPoint& a, const TempoPoint& b) { return a.tick < b.tick; });
+  if (next.loop.startTick >= end) { next.loop.startTick += len; next.loop.endTick += len; }
+  next.lengthTicks += len;
+  Section copy{nextId(next.sections, "s"), (original.name + " 2").substr(0, 40), end, len, json::object(), original.color};
+  next.sections.push_back(copy);
+  sortSections(next);
+  doc = std::move(next);
   return copy.id;
 }
 

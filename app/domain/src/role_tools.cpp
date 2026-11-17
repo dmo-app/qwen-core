@@ -33,6 +33,24 @@ std::string whyNot(const RoleMap& map, const std::string& role, const std::strin
   return label + ": no parameter for " + (m ? m->label : macro) + " (Settings > Roles)";
 }
 std::string percent(double v) { return std::to_string((int)std::lround(v * 100)) + "%"; }
+// The chain has room for every role about to be written (audit 2026-11-17, #5). Only roles that need a NEW effect
+// count: a role already on the chain, tagged with it or played by the same plugin put there by hand, rides on the
+// slot it has, which is why this asks roleEffectSlot and not findRoleEffect. Roles that were not asked for are not
+// counted, so the caller passes only the ones it will write. Throws the very error addPluginEffect would throw, but
+// before the first write, so a full chain leaves the document exactly as it was.
+void requireChainRoom(const Document& doc, const std::string& trackId, const RoleMap& map, const std::vector<std::string>& roles) {
+  const size_t length = effectChain(doc, trackId).size();
+  std::set<std::string> seen;
+  std::set<int> taken;  // a slot an earlier role in this same call is about to tag: the next role cannot share it
+  int fresh = 0;
+  for (const auto& role : roles) {
+    if (!seen.insert(role).second) continue;
+    const int at = roleEffectSlot(doc, trackId, role, map);
+    if (at < 0 || taken.count(at)) ++fresh;
+    else taken.insert(at);
+  }
+  if ((int)length + fresh > kMaxEffectsPerChain) throw DocumentError("effects", "the chain has the maximum of 16 effects");
+}
 std::string bars(int64_t ticks) {
   const double b = (double)ticks / (4.0 * kPpq);
   if (std::abs(b - std::round(b)) < 1e-9) return std::to_string((int64_t)std::round(b)) + (std::round(b) == 1 ? " bar" : " bars");
@@ -71,23 +89,31 @@ RoleToolResult toolSuck(Document& doc, const std::string& trackId, const RoleMap
   const int64_t start = dropTick - lengthTicks;
   checkSpan(doc, start, dropTick);
   checkMacro(map, "reverb", "mix");
+  const bool withFilter = hasMacro(map, "filter", "cutoff");
+  // All or nothing (audit 2026-11-17, #5): the reverb sweep used to be written before the filter's addPluginEffect
+  // found the chain full, so a 16-effect chain ended up half sucked. Nothing is written until the whole tool fits.
+  std::vector<std::string> needed{"reverb"};
+  if (withFilter) needed.push_back("filter");
+  requireChainRoom(doc, trackId, map, needed);
+  Document next = doc;
   RoleToolResult r;
   const RoleBinding& reverb = *map.find("reverb");
-  r.keys.push_back(writeRoleSweep(doc, trackId, map, "reverb", "mix", start, dropTick, roleRest(reverb, "reverb", "mix"), 0.25 + 0.7 * amount, 2.0));
+  r.keys.push_back(writeRoleSweep(next, trackId, map, "reverb", "mix", start, dropTick, roleRest(reverb, "reverb", "mix"), 0.25 + 0.7 * amount, 2.0));
   if (hasMacro(map, "reverb", "size")) {
     const double rest = roleRest(reverb, "reverb", "size");
-    r.keys.push_back(writeRoleSweep(doc, trackId, map, "reverb", "size", start, dropTick, rest, std::max(rest, 0.5 + 0.5 * amount), 1.5));
+    r.keys.push_back(writeRoleSweep(next, trackId, map, "reverb", "size", start, dropTick, rest, std::max(rest, 0.5 + 0.5 * amount), 1.5));
   }
   r.roles.push_back("reverb");
-  if (hasMacro(map, "filter", "cutoff")) {
+  if (withFilter) {
     const double rest = roleRest(*map.find("filter"), "filter", "cutoff");
-    r.keys.push_back(writeRoleSweep(doc, trackId, map, "filter", "cutoff", start, dropTick, rest, rest * (1.0 - 0.6 * amount), 1.5));
+    r.keys.push_back(writeRoleSweep(next, trackId, map, "filter", "cutoff", start, dropTick, rest, rest * (1.0 - 0.6 * amount), 1.5));
     r.roles.push_back("filter");
   } else {
     r.skipped.push_back(whyNot(map, "filter", "cutoff"));
   }
   r.sentence = "SUCK: the reverb opens over the last " + bars(lengthTicks) + " up to " + percent(0.25 + 0.7 * amount) +
                (r.roles.size() > 1 ? ", the filter closes" : "") + ", and everything is back on the drop";
+  doc = std::move(next);
   return r;
 }
 
@@ -163,10 +189,15 @@ RoleToolResult toolBuildupFx(Document& doc, const std::string& trackId, const Ro
     else if (main) r.skipped.push_back(whyNot(map, m.role, m.macro));
   }
   if (todo.empty()) throw DocumentError("buildup", r.skipped.empty() ? "no effect to write" : r.skipped.front());
+  // All or nothing (audit 2026-11-17, #5), and the same pre-check as toolSuck: the delay alone takes two roles.
+  std::vector<std::string> needed;
+  for (const Move* m : todo) needed.push_back(m->role);
+  requireChainRoom(doc, trackId, map, needed);
+  Document next = doc;
   std::vector<std::string> words;
   for (const Move* m : todo) {
     const double from = m->fromRest ? roleRest(*map.find(m->role), m->role, m->macro) : m->from;
-    r.keys.push_back(writeRoleSweep(doc, trackId, map, m->role, m->macro, start, dropTick, from, m->to, m->curve));
+    r.keys.push_back(writeRoleSweep(next, trackId, map, m->role, m->macro, start, dropTick, from, m->to, m->curve));
     if (std::find(r.roles.begin(), r.roles.end(), m->role) == r.roles.end()) {
       r.roles.push_back(m->role);
       const std::string role = m->role;
@@ -176,6 +207,7 @@ RoleToolResult toolBuildupFx(Document& doc, const std::string& trackId, const Ro
   r.sentence = "Build-up effects over " + bars(dropTick - start) + ": ";
   for (size_t i = 0; i < words.size(); ++i) r.sentence += (i ? (i + 1 == words.size() ? " and " : ", ") : "") + words[i];
   r.sentence += ", back on the drop";
+  doc = std::move(next);
   return r;
 }
 
@@ -382,17 +414,23 @@ RoleToolResult toolIntentFx(Document& doc, const std::string& trackId, const Rol
     else r.skipped.push_back(whyNot(map, m.role, m.macro));
   }
   if (todo.empty()) throw DocumentError("fx", r.skipped.front());
+  // All or nothing (audit 2026-11-17, #5): no intent may leave a document with only the first sweep written.
+  std::vector<std::string> needed;
+  for (const Move* m : todo) needed.push_back(m->role);
+  requireChainRoom(doc, trackId, map, needed);
+  Document next = doc;
   std::string sentence = head + ": ";
   for (size_t i = 0; i < todo.size(); ++i) {
     const Move* m = todo[i];
     const double rest = roleRest(*map.find(m->role), m->role, m->macro);
-    r.keys.push_back(writeRoleSweep(doc, trackId, map, m->role, m->macro, start, end, m->fromRest ? rest : m->from,
+    r.keys.push_back(writeRoleSweep(next, trackId, map, m->role, m->macro, start, end, m->fromRest ? rest : m->from,
                                     m->toRest ? rest : m->to, m->curve));
     r.roles.push_back(m->role);
     sentence += std::string(i ? " and " : "") + m->words;
   }
   if (what == "break") sentence += " while it lasts";
   r.sentence = sentence + " (" + bars(end - start) + ")";
+  doc = std::move(next);
   return r;
 }
 

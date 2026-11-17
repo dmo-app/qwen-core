@@ -58,6 +58,11 @@ double roleRest(const RoleBinding& b, const std::string& role, const std::string
 // The plugin effect of `role` on the track's chain (trackId "" = the master): the one tagged with the role, else
 // an effect of the same plugin. -1 when there is none.
 int findRoleEffect(const Document& doc, const std::string& trackId, const std::string& role);
+// The chain slot that plays `role` the same way ensureRoleEffect would find it: the effect tagged with the role, or
+// the role's plugin already on the chain put there by hand. -1 when the role would need a NEW effect, so a caller
+// that is about to write can check the chain has room before it writes anything (audit 2026-11-17, #5). Throws
+// DocumentError for a role that is not mapped or is an instrument role, exactly as ensureRoleEffect does.
+int roleEffectSlot(const Document& doc, const std::string& trackId, const std::string& role, const RoleMap& map);
 // The role's effect on the track: the one there, or the role's plugin added at the end of the chain (tagged with the
 // role). Returns the effect's id. Throws DocumentError when the role is not mapped, is an instrument role, or the
 // chain is full.
