@@ -1,5 +1,11 @@
 # Relatório — 2026-11-17 — separação da criação de música (core-main → core-create)
 
+> **Estado no fim do dia (ler com os dois adenda em baixo).** Este relatório media uma extracção do **core-main**.
+> Essa extracção foi **substituída**: depois da tua instrução sobre técnicas e métodos por estilo, o `core-create`
+> passou a vir do **CORE-MANUAL** `8dc3a33` e está em `main` = **`eb653f8`**. O texto e os números de CC-01 a CC-10
+> mantêm-se como foram medidos na altura; não foram reescritos.
+
+
 ## O que foi medido
 
 - **Repositório, branch e SHA inicial/final.** Fonte: `dmo-app/core-main`, branch mais recente medido com
@@ -134,3 +140,55 @@ darkpsycore **210** (é 225), hitech **220** (é 190), slambient **250** (é 300
 **O que fica.** A informação está toda legível e organizada por estilo, como pediste, e não há um único JSON.
 Quando disseres o formato (nome de campo, se as notas ficam em tabela markdown ou em ficheiro próprio, se
 `core-create` é fonte ou relatório), o gerador volta a emitir — ele já leu tudo isso do core-main uma vez.
+
+## Addendum — 2026-11-17, terceiro do dia: a fonte era o CORE-MANUAL e o que tu querias era o método
+
+A tua instrução, palavra por palavra: **"a informaçao que quero é as tecnicas, metodos, de criaçao de cada estilo,
+pods meter psytrance como mais um estilo"** — e a de antes, que eu não tinha seguido à letra: *"no core-manual para
+core-create, toda informaçao sobre a app fica fora, so quero sobre criaçaio de musica por estilo"*.
+
+**O erro que aqui se corrige, dito claramente.** Eu extraí do **core-main**. Tu tinhas escrito *core-manual*, e o
+CORE-MANUAL é mesmo o sítio do conhecimento: `AICORE/docs/knowledge/README.md` diz que o conhecimento sobre o Core
+só existe no CORE-MANUAL (decisão tua, 2026-11-07, "a informação fica num só lado, para não haver conflitos").
+As duas versões que publiquei (`de92f90`, `2d438c9`) eram **a forma dos dados** em markdown — padrões, tabelas de
+notas, fichas de templates. Não eram técnicas nem métodos. Isto não é um refactor: era o repo errado.
+
+**O que está publicado agora** — `dmo-app/core-create`, `main` = **`eb653f8`**, fonte **CORE-MANUAL `8dc3a33`**:
+
+- **67 ficheiros**: 62 de conteúdo, 4 de topo (`README`, `INDICE`, `fontes`, `estatutos`) e
+  `ferramentas/gerar-core-create.py`, que reproduz tudo a partir da revisão fixa do manual (`git show`, só leitura).
+  **0 JSON** — mantém-se a tua instrução de hoje.
+- **4 estilos** em `estilos/<estilo>/`, cada um com páginas por tema: carácter e tempo (com as variantes de base),
+  ritmo e baixo, estrutura e arranjo, som dos instrumentos, efeitos e automação, níveis e mistura, masterização,
+  faixas de referência, samples que encaixam, procedimentos, fora do estilo, subestilos, lacunas e fichas de técnica.
+- **psytrance entrou como estilo a sério** (15 páginas): os dois tutoriais transcritos (145 e 140 BPM), os perfis de
+  darkpsy / twilight / full-on / progressive, e as lacunas dele à vista — sem template, sem níveis aprovados, sem
+  referência medida, como o manual diz.
+- `geral/` com o que serve todos os estilos: regras comuns, gramática KBBB e baixo elástico, fichas comuns, perfis
+  de produção por família e os capítulos de método do guia (kick e baixo, síntese, arranjo, mistura, samples,
+  fluxo de trabalho, da ideia à faixa).
+- Cada ficheiro traz no cabeçalho o caminho exacto da fonte no CORE-MANUAL e a revisão. **Nada foi reclassificado**:
+  o `[estatuto]` e a chave viajam com a linha (`estatutos.md` conta-os: 104 `[codigo]`, 48 `[online]`,
+  22 `[decisao_diogo]`, 22 `[estudo]`, 19 `[hipotese]`, 11 `[medido]`, 11 `[externo]`).
+
+**Quanto é app, e o que foi cortado** (o gerador conta e volta a contar ao correr): 200 frases com informação da app,
+41 itens de lista que eram só app, 147 ligações internas do manual, 38 fragmentos de frase cortada, 15 linhas de
+tabela, 7 colunas e 3 tabelas inteiras, 7 secções (`Plugins`, `Biblioteca D:\Samples`, `Estado do motor`,
+`Parâmetros reais dos plugins`, `Ferramentas MCP`, etc). Do que sobrou foi feita **auditoria**: **1 ocorrência** de
+nome da app no corpo das páginas — `STUTTER` dentro do exemplo de pedido ("Ask: …") da ficha de psytrance. Não a
+cortei porque a frase é informação de estrutura musical; está dito no `fontes.md`, não escondido.
+
+**Verificação medida, fora do gerador.** Links internos: 119, **0 partidos**. `find -name '*.json'`: **0**.
+Cabeçalho de proveniência: **62/62** ficheiros de conteúdo. Texto corrompido ou caracteres inesperados: **0**.
+Contas de conteúdo no `fontes.md`: 374 itens de lista na parte consumida das 17 fontes; 518 linhas extraídas
+(itens + parágrafos, com repetição quando a mesma fonte alimenta várias páginas).
+
+**Não medido — não afirmo.** Se esta granulometria (página por tema, por estilo) é a que serve; se os capítulos do
+guia devem viver aqui ou só no manual (deixei-os em inglês, sem traduzir, para não inventar); se darkpsy, twilight,
+full-on e progressive hão-de ser pastas de estilo próprias em vez de páginas dentro de psytrance; e quem lê o
+`core-create` — tu, a IA, ou o programa — porque isso decide o formato, não o conteúdo.
+
+**Efeito nos itens deste relatório.** CC-01 a CC-10 mediram a extracção do core-main; **ficam ultrapassados como
+fonte** e mantenho o texto acima sem reescrita (regra 9). Nada foi apagado: a tag **`antes-core-manual`** aponta para
+`2d438c9` e os 87 blobs anteriores continuam no histórico do repo. **O core-main não foi tocado** — continua em
+`52d46c039`, e só usei `git show`/`ls-tree`.

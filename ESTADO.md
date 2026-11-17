@@ -11,7 +11,18 @@ Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGEN
 | Produto e fronteira | Documentados; commits ecd2c7a e 5445152; não implementam limpeza | [Produto](docs/DIRECCAO-CORE-PATTERN-MAKER-TOOLS.md), [fronteira](docs/FRONTEIRA-CORE-AICORE.md) |
 | Catálogo | Inventário de 45 patterns: 39 origem AICORE, 6 outras; preservação decidida | Anexo da fronteira / PROD-03 |
 | Organização documental | Regras, índice, procedimento, modelo e relatório; sem alteração de código | [Relatório](docs/relatorios/2026-11-17-organizacao-repo.md) |
-| Criação de música fora do core-main → `dmo-app/core-create` | Extracção só de leitura de `origin/main` = `52d46c0`; 8 estilos, 45 páginas de padrão (1034 notas conferidas contra o git), 21 fichas de 3,2 MB → 68 KB. **Só markdown, 0 JSON**, por instrução do dono de hoje; core-main intacto | [Relatório](docs/relatorios/2026-11-17-core-create.md) com addendum datado; repo `core-create main` = `2d438c9` |
+| Criação de música por estilo → `dmo-app/core-create` | Extracção só de leitura do **CORE-MANUAL** `origin/main` = `8dc3a33` (não do core-main, como nas duas versões anteriores — ver adendum). Conteúdo = **técnicas e métodos de criação por estilo**: 4 estilos (darkpsycore 13 páginas, hitech 13, slambient 12, **psytrance 15**) + `geral/` 12 + 4 de topo + o gerador = **67 ficheiros, 1595 linhas / 141 KB, 0 JSON**. Cortes medidos: 200 frases de app, 147 ligações internas, 41 itens só app, 38 fragmentos, 15 linhas de tabela, 7 colunas, 3 tabelas reduzidas a 1 coluna, 7 secções de app, 10 itens curtos. Consumidos 374 itens de lista de 17 fontes → 518 linhas extraídas. Auditoria de nomes do Core no que sobrou: **1 ocorrência** (`psytrance/14-fichas-de-tecnica.md:49`, `STUTTER`). core-main e CORE-MANUAL intactos | [Relatório](docs/relatorios/2026-11-17-core-create.md) com três adenda datados; repo `core-create main` = `eb653f8`; versão anterior preservada na tag `antes-core-manual` (`2d438c9`) |
+
+## Onde está o quê (medido em 17/11)
+
+| Repo | Papel | Estado |
+| --- | --- | --- |
+| `dmo-app/CORE-MANUAL` | Fonte única do conhecimento musical (decisão do dono de 07/11) | `origin/main` = `8dc3a33`; lido, não escrito |
+| `dmo-app/core-create` | View de técnicas e métodos de criação por estilo, extraída do CORE-MANUAL | `main` = `eb653f8`; versão anterior na tag `antes-core-manual` (`2d438c9`) |
+| `dmo-app/core-main` | A app e os seus dados; fonte da aplicação | `main` = `52d46c0`; não tocado |
+| `dmo-app/AICORE` | Laboratório / addon do Core, fora do binário | não tocado nesta sessão |
+
+Errei a fonte nas duas primeiras extracções (core-main em vez de CORE-MANUAL); está registado no adendum do relatório, não apagado.
 
 ## Próximo trabalho
 
@@ -25,7 +36,7 @@ Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGEN
 | 2 | Preservar Pattern Maker e alinhamento pratos/kick/baixo | Provas de regressão antes de retirar módulos |
 | 3 | Formatos adicionais de plugins | Preparar matriz; não prometer suporte universal |
 | 3 | Contrato docs/contracts/core-calls.md | Ausente no snapshot auditado; distinguir legado de contrato alvo |
-| 3 | Curadoria do core-create | `psytrance` não tem entrada em `pcore/styles.json` nem template; decidir se entra no catálogo ou sai dos padrões. Falta a tua decisão do **formato**: por agora o repo é só markdown, 0 JSON (instrução de 17/11); quando o formato for decidido, o gerador volta a emitir. Decidir também se algum lado passa a ler `core-create` (D50) enquanto o core-main continua a fonte da app |
+| 3 | Curadoria do core-create | **Não medido / à espera de ti.** (1) Granulometria: 13–15 páginas por estilo com esta divisão é o que queres, ou páginas mais curtas e mais delas? (2) O guia em inglês (`knowledge/*`, capítulos do guia) ficou em inglês dentro de páginas PT — traduzir ou deixar? (3) Sub-géneros do psytrance (darkpsy, twilight, full-on, progressive) como pastas próprias em vez de uma página de perfis? (4) `14-fichas-de-tecnica.md` do psytrance tem 1 ocorrência de nome do Core (`STUTTER`) — cortá-la ou alterar a ficha no CORE-MANUAL? (5) Quem lê o `core-create` e se algum lado passa a consumi-lo (D50); enquanto não decidires, o repo é só markdown, 0 JSON, e a fonte da app continua a ser o core-main. A extracção CC-01…CC-10 da primeira versão fica ultrapassada como fonte |
 | 3 | Control itens 19–25 e variantes dos bugs | Revalidar e classificar Core/AICORE pela fronteira, sem mover código automaticamente |
 
 ## O que não está provado
@@ -35,6 +46,7 @@ Este ficheiro é o ponto de passagem entre auditores; regras em [AGENTS.md](AGEN
 - Independência com pacote AI ausente, pipes AI e compatibilidade de formatos adicionais não estão demonstrados.
 - Cache: audit reporta hash inicial de 64 KiB e revalidação parcial WAV; tail/hash total foram sugestões, não implementação comprovada.
 - Não há workflow GitHub na árvore consultada. Gates locais existentes: ci/gate.sh e ci/gate.ps1. “Tier1/Tier2” não são critérios executáveis definidos aqui.
+- Cobertura do core-create: **não medida**. O corte é mecânico (regras no gerador) e pode ter deitado fora técnica válida junto do texto da app; só as 17 fontes listadas em `fontes.md` do repo é que foram consumidas. Não foi lido por um produtor para validar utilidade musical.
 
 ## Decisões e histórico
 
