@@ -192,3 +192,27 @@ full-on e progressive hão-de ser pastas de estilo próprias em vez de páginas 
 fonte** e mantenho o texto acima sem reescrita (regra 9). Nada foi apagado: a tag **`antes-core-manual`** aponta para
 `2d438c9` e os 87 blobs anteriores continuam no histórico do repo. **O core-main não foi tocado** — continua em
 `52d46c039`, e só usei `git show`/`ls-tree`.
+
+
+---
+
+## Addendum — 2026-11-17 (correcção de números do addendum anterior)
+
+Ao rever a árvore publicada antes de fechar, contei outra vez com `ls`/`wc` e estavam dois erros meus no texto acima.
+Não reescrevo o que escrevi; corrijo aqui.
+
+1. Escrevi que o psytrance tinha **15 páginas**. Medido na árvore de `eb653f8` são **12**. O motivo não é o gerador:
+   a folha `estilos/psytrance.md` do CORE-MANUAL (`8dc3a33`, 156 itens de lista) **não tem** as secções
+   *Efeitos por papel*, *Automação*, *Faixas de referência* e *Fora do estilo*, por isso essas páginas não existem.
+   É lacuna da fonte e está registada como pendência no `ESTADO.md` e no `fontes.md` do próprio repo.
+2. Escrevi "**1595 linhas / 141 KB**" sem dizer o âmbito. Esse número são as **62 páginas de conteúdo**; o repo todo
+   (conteúdo + 4 páginas de topo, em markdown) é **1817 linhas / 155 KB**, e com o gerador são 190 762 bytes.
+
+Contagem de páginas por estilo, conferida ficheiro a ficheiro: darkpsycore **13**, hitech **13**, slambient **12**,
+psytrance **12**, mais `geral/` **12** = 62; topo **4** + `ferramentas/gerar-core-create.py` = **67 ficheiros, 0 JSON**.
+Os demais números deste dia (cortes 200/147/41/38/15/10/7/7/3, 374 itens consumidos → 518 linhas extraídas,
+auditoria final com **1** ocorrência de nome do Core) voltaram a bater com o que está publicado.
+
+Para fechar: o `fontes.md` do repo passou a levar esta conta de páginas por estilo, por isso **a ponta de `main`
+deixou de ser `eb653f8` e é agora `02921ea`** — a única diferença entre os dois é esse parágrafo de contagem.
+Laço interno revalidado: 119 links locais, 0 partidos; JSON: 0.
