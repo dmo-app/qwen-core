@@ -181,4 +181,46 @@ TEST("MIDI importar para um padrao: notas no padrao a partir de um ponto, as de 
   CHECK_THROWS(importMidiIntoPattern(p, f, 0, 3));
 }
 
+// Auditoria 2026-11-17, item 2: com o cabecalho a prometer mais pistas do que as que ha nos bytes, o leitor
+// parava em silencio e a app dizia "Importadas N pistas" com uma lista mais curta. midi.hpp promete DocumentError.
+TEST("MIDI ler: o cabecalho a prometer mais pistas do que as que o ficheiro tem da erro") {
+  // Uma MTrk completa (19 bytes): tempo, uma nota, a sua pausa e o fim da pista.
+  const std::vector<uint8_t> chunk = {'M', 'T', 'r', 'k', 0, 0, 0, 19,
+                                      0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20,   // 120 BPM
+                                      0x00, 0x90, 60, 100,
+                                      0x60, 0x80, 60, 0,
+                                      0x00, 0xFF, 0x2F, 0x00};
+  // Formato 1, 960 por seminima; a cabecalho di 2 pistas, so uma esta aqui.
+  std::vector<uint8_t> cut = {'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 1, 0, 2, 0x03, 0xC0};
+  cut.insert(cut.end(), chunk.begin(), chunk.end());
+  CHECK_THROWS(parseMidi(cut));
+  std::string message;
+  try {
+    (void)parseMidi(cut);
+  } catch (const DocumentError& e) {
+    message = e.what();
+  }
+  CHECK(message.find("1 of 2") != std::string::npos);  // o que se leu contra o que se prometeu
+  // O mesmo ficheiro com o numero de pistas certo le-se.
+  std::vector<uint8_t> whole = cut;
+  whole[11] = 1;
+  const MidiFile f = parseMidi(whole);
+  CHECK_EQ(f.ppq, 960);
+  CHECK_EQ(f.tracks.size(), (size_t)1);
+  CHECK_EQ(f.tracks[0].notes.size(), (size_t)1);
+  // Pistas a mais do que as prometidas, e bytes depois delas, continua a ler-se.
+  std::vector<uint8_t> more = {'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 1, 0, 1, 0x03, 0xC0};
+  more.insert(more.end(), chunk.begin(), chunk.end());
+  more.insert(more.end(), chunk.begin(), chunk.end());
+  CHECK_EQ(parseMidi(more).tracks.size(), (size_t)1);
+  // Um chunk que nao e MTrk no meio nao conta como pista: as duas leem-se.
+  std::vector<uint8_t> listed = {'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 1, 0, 2, 0x03, 0xC0};
+  listed.insert(listed.end(), chunk.begin(), chunk.end());
+  const std::vector<uint8_t> listChunk = {'L', 'I', 'S', 'T', 0, 0, 0, 4, 'i', 'n', 'f', 'o'};
+  listed.insert(listed.end(), listChunk.begin(), listChunk.end());
+  listed.insert(listed.end(), chunk.begin(), chunk.end());
+  const MidiFile both = parseMidi(listed);
+  CHECK_EQ(both.tracks.size(), (size_t)2);
+}
+
 CORE_TEST_MAIN

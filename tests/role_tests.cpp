@@ -417,3 +417,62 @@ TEST("cartoes das tools: a lista esta certa, sem S-Core, e acha-se por id e pelo
     CHECK(findCorePlugin(card) != nullptr);
   }
 }
+
+// Auditoria 2026-11-17, item 5: com a cadeia dos efeitos cheia, o SUCK escrevia a curva do reverb e so depois
+// o filtro era recusado, deixando a musica a meio mudada (o contrato de role_tools.hpp: um passo de undo ou nada).
+TEST("SUCK: uma cadeia de efeitos cheia recusa-se antes de escrever seja o que for") {
+  Document d = newTemplateDocument();
+  const std::string bass = trackNamed(d, "ass");
+  addPluginEffect(d, bass, fakePlugin("ValhallaRoom"));  // o reverb ja la esta, sem papel marcado
+  for (int i = 0; i < 15; ++i) addEffect(d, bass, "eq");
+  CHECK_EQ(effectChain(d, bass).size(), (size_t)16);
+  const std::string before = toJson(d).dump();
+  CHECK_THROWS(toolSuck(d, bass, fullMap(), 8 * 4 * kPpq, 2 * 4 * kPpq));  // o filtro nao cabe
+  CHECK_EQ(toJson(d).dump(), before);  // antes: ficava atras a curva "fx:<id>:vst:0" do reverb
+  CHECK_EQ(effectChain(d, bass).size(), (size_t)16);
+  size_t curves = 0;
+  for (const auto& t : d.tracks) curves += t.automation.size();
+  CHECK_EQ(curves, (size_t)0);  // nenhuma curva de nenhum papel, em parte nenhuma
+  // Os dois papeis ja estao na cadeia: nao e preciso nenhum efeito novo, por isso nao se recusa (nada de recusas falsas).
+  Document e = newTemplateDocument();
+  const std::string kick = trackNamed(e, "ick");
+  addPluginEffect(e, kick, fakePlugin("ValhallaRoom"));
+  addPluginEffect(e, kick, fakePlugin("Filter"));
+  for (int i = 0; i < 14; ++i) addEffect(e, kick, "eq");
+  CHECK_EQ(effectChain(e, kick).size(), (size_t)16);
+  const RoleToolResult r = toolSuck(e, kick, fullMap(), 8 * 4 * kPpq, 2 * 4 * kPpq);
+  CHECK_EQ(r.roles.size(), (size_t)2);
+  CHECK_EQ(effectChain(e, kick).size(), (size_t)16);  // os mesmos 16, agora com o papel marcado
+  int tagged = 0;
+  for (const auto& fx : effectChain(e, kick))
+    if (fx.value("type", std::string()) == "plugin" && fx.contains("role")) ++tagged;
+  CHECK_EQ(tagged, 2);
+  // Com sitio na cadeia, escreve-se tudo como dantes.
+  Document f = newTemplateDocument();
+  const std::string hats = trackNamed(f, "ats");
+  const RoleToolResult ok = toolSuck(f, hats, fullMap(), 8 * 4 * kPpq, 2 * 4 * kPpq);
+  CHECK_EQ(effectChain(f, hats).size(), (size_t)2);
+  CHECK_EQ(ok.keys.size(), (size_t)3);  // reverb mix, reverb size, filtro cutoff
+}
+
+// O mesmo shape dos outros dois: tambem recusam antes de escrever quando o que ha de escrever nao cabe.
+TEST("build-up e fx por intencao: cadeia cheia nao deixa metade escrita") {
+  Document d = newTemplateDocument();
+  const std::string bass = trackNamed(d, "ass");
+  addPluginEffect(d, bass, fakePlugin("ValhallaRoom"));
+  for (int i = 0; i < 15; ++i) addEffect(d, bass, "eq");
+  const std::string before = toJson(d).dump();
+  BuildupFx fx;
+  fx.filter = false;
+  fx.reverb = true;   // ja esta na cadeia: escreve-se primeiro
+  fx.delay = true;    // e este nao cabe, e so se sabe depois (era isso que deixava a curva atras)
+  CHECK_THROWS(toolBuildupFx(d, bass, fullMap(), 4 * 4 * kPpq, 6 * 4 * kPpq, fx));
+  CHECK_EQ(toJson(d).dump(), before);
+  Document e = newTemplateDocument();
+  const std::string kick = trackNamed(e, "ick");
+  addPluginEffect(e, kick, fakePlugin("Filter"));
+  for (int i = 0; i < 15; ++i) addEffect(e, kick, "eq");
+  const std::string was = toJson(e).dump();
+  CHECK_THROWS(toolIntentFx(e, kick, fullMap(), "intro", 0, 4 * 4 * kPpq, 0.7));  // falta o reverb
+  CHECK_EQ(toJson(e).dump(), was);
+}

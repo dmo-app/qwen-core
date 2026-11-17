@@ -8,11 +8,14 @@
 #include "assets.hpp"
 #include "autosave.hpp"
 #include "edit.hpp"
+#include "samples.hpp"
 #include "storage.hpp"
 #include "templates.hpp"
 #include "core/project.hpp"
+#include "core/assets.hpp"
 #include "core/render_job.hpp"
 #include "core/server.hpp"
+#include "io/audio_file.hpp"
 #include "io/wav.hpp"
 
 namespace fs = std::filesystem;
@@ -181,6 +184,68 @@ TEST("auditoria B06: render com endTick 0 e uma regiao vazia e e recusado, como 
   CHECK(!r["ok"].get<bool>());
   r = server.handle({{"cmd", "render"}, {"args", {{"path", out.string()}, {"bits", 32}, {"tailMs", 0}}}});
   CHECK(r["ok"].get<bool>());  // sem fim: a musica toda
+}
+
+// Auditoria 2026-11-17, item 3a: a varredura guardava o registo anterior pelo caminho, o tamanho e a data; um
+// ficheiro trocado por dentro, com os mesmos bytes e a mesma data, ficava com o sha256 e o nivel de antes.
+TEST("amostras: um wav trocado por dentro, com os mesmos bytes e a mesma data, le de novo") {
+  const fs::path dir = freshDir("samples-in-place");
+  const fs::path wav = dir / "kick.wav";
+  // 0,5 s de um seno a 48 kHz / 24 bits / estereo; `amp` muda o nivel, nunca o numero de bytes.
+  const auto write = [&](float amp) {
+    const auto L = coretest::sine(440, 48000, 24000, amp);
+    core::writeWav(wav.string(), L, L, 48000, 24);
+  };
+  write(0.8f);
+  const core::doc::SampleIndex first = core::doc::scanLibrary(dir);
+  CHECK_EQ(first.samples.size(), (size_t)1);
+  const std::string sha = first.samples.at(0).sha256;
+  const double loud = first.samples.at(0).loudDb;
+  const int64_t size = first.samples.at(0).size;
+  const auto stamp = fs::last_write_time(wav);
+  write(0.2f);                        // o mesmo sitio, os mesmos bytes, outro som
+  fs::last_write_time(wav, stamp);    // e a mesma data
+  CHECK_EQ((int64_t)fs::file_size(wav), size);
+  CHECK(fs::last_write_time(wav) == stamp);  // a data voltou mesmo
+  const core::doc::SampleIndex again = core::doc::scanLibrary(dir, &first);
+  const core::doc::SampleIndex fresh = core::doc::scanLibrary(dir);  // a expectativa medida, nao escrita a mao
+  CHECK_EQ(again.samples.size(), (size_t)1);
+  CHECK_EQ(again.samples.at(0).sha256, fresh.samples.at(0).sha256);
+  CHECK_EQ(again.samples.at(0).loudDb, fresh.samples.at(0).loudDb);
+  CHECK(again.samples.at(0).sha256 != sha);   // o conteudo e outro
+  CHECK(again.samples.at(0).loudDb != loud);  // e o nivel foi atras
+}
+
+// Auditoria 2026-11-17, item 3b: a cache do motor era guardada por caminho, taxa, tamanho e data; o mesmo
+// ficheiro trocado por dentro servia para sempre do cache.
+TEST("motor: um wav trocado por dentro, com os mesmos bytes e a mesma data, sai do cache") {
+  const fs::path dir = freshDir("assets-in-place");
+  const fs::path wav = dir / "take.wav";
+  const auto write = [&](int rate, int64_t frames) {  // os mesmos bytes sempre: frames e canais constantes
+    const auto L = coretest::sine(440, (double)rate, frames, 0.5f);
+    core::writeWav(wav.string(), L, L, rate, 24);
+  };
+  write(48000, 2000);
+  const int64_t size = (int64_t)fs::file_size(wav);
+  const auto stamp = fs::last_write_time(wav);
+  core::AssetStore store;
+  std::string err;
+  const auto before = store.get(wav.string(), 48000, &err);
+  CHECK(before != nullptr);
+  CHECK_EQ(before->frames(), (int64_t)2000);
+  write(24000, 2000);                     // as mesmas 2000 amostras a 24 kHz: os mesmos bytes, outro audio
+  fs::last_write_time(wav, stamp);
+  CHECK_EQ((int64_t)fs::file_size(wav), size);
+  CHECK(fs::last_write_time(wav) == stamp);
+  const auto after = store.get(wav.string(), 48000, &err);
+  core::AssetStore fresh;                 // o que uma carga nova da: a expectativa medida, nao escrita a mao
+  std::string err2;
+  const auto expected = fresh.get(wav.string(), 48000, &err2);
+  CHECK(expected != nullptr);
+  CHECK_EQ(expected->frames(), (int64_t)4000);  // 2000 amostras a 24 kHz sao 4000 a 48 kHz
+  CHECK_EQ(after->frames(), expected->frames());
+  CHECK_EQ((int)after->channels, (int)expected->channels);
+  CHECK_EQ(after->sampleRate, expected->sampleRate);
 }
 
 CORE_TEST_MAIN

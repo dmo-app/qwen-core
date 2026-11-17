@@ -9,8 +9,10 @@
 #include <limits>
 #include <tuple>
 #include "assets.hpp"
+#include "autosave.hpp"
 #include "bounce.hpp"
 #include "edit.hpp"
+#include "randomize.hpp"
 #include "storage.hpp"
 #include "templates.hpp"
 #include "core/project.hpp"
@@ -296,6 +298,45 @@ TEST("caca 2, seccao 4: um ppq que nao e 960 tem uma mensagem que se entende") {
   try { (void)core::doc::parseDocument(j); } catch (const core::doc::DocumentError& e) { message = e.what(); }
   CHECK(message.find("must be 960") != std::string::npos);
   CHECK(message.find("between") == std::string::npos);
+}
+
+// Auditoria 2026-11-17, item 1: o randomizador dava nomes de ate 80 bytes e o leitor (document.cpp) recusa
+// padroes com nome acima de 40 bytes, por isso guardar e autosave falhavam numa musica que a app aceitou.
+TEST("caca audit 2026-11-17 #1: os nomes que o randomizador da aos padroes entram no leitor e guardam-se") {
+  const fs::path dir = freshDir("audit1");
+  Document d = core::doc::newTemplateDocument();
+  d.extra["template"] = {{"style", "Dark psycore"}};
+  d.lengthTicks = 32 * 4 * core::doc::kPpq;  // duas seccoes de 16 compassos: e assim que o "second roll" toca
+  for (auto& t : d.tracks)
+    for (auto& c : t.clips) c.lengthTicks = d.lengthTicks;
+  // A primeira chamase 20 "ç" (40 bytes): um corte feito por bytes a meio deles parte um caracter ao meio.
+  std::string cedillas;
+  for (int i = 0; i < 20; ++i) cedillas += "\xc3\xa7";
+  core::doc::addSection(d, cedillas, 0, 16 * 4 * core::doc::kPpq);
+  core::doc::addSection(d, std::string(40, 'x'), 16 * 4 * core::doc::kPpq, 16 * 4 * core::doc::kPpq);
+  for (auto& s : d.sections) s.extra["energy"] = 4;  // com energia 2 ou mais o baixo reescreve-se
+  std::set<std::string> beforeIds;
+  for (const auto& p : core::doc::trackById(d, "bass").patterns) beforeIds.insert(p.id);
+  const std::vector<std::string> did = core::doc::randomizeStyle(d, {3, 2, {"bass"}});
+  size_t created = 0;
+  std::set<std::string> bassNames;
+  for (const auto& p : core::doc::trackById(d, "bass").patterns)
+    if (!beforeIds.count(p.id)) { ++created; bassNames.insert(p.name); }
+  CHECK(!did.empty());
+  CHECK_EQ(created, (size_t)6);                  // roll, turn e second roll em cada uma das duas seccoes
+  CHECK_EQ(bassNames.size(), created);           // e todos com nome diferente uns dos outros
+  size_t over = 0, split = 0;
+  for (const auto& t : d.tracks)
+    for (const auto& p : t.patterns) {
+      if (p.name.size() > 40) ++over;            // o limite do leitor sao 40 BYTES
+      if (!validUtf8(p.name)) ++split;           // e um corte a meio de um caracter nao e UTF-8
+    }
+  CHECK_EQ(over, (size_t)0);
+  CHECK_EQ(split, (size_t)0);
+  core::doc::saveFile(d, dir / "song.core");     // antes (relatorio): SaveError na leitura de confirmacao
+  CHECK_EQ(core::doc::openFile(dir / "song.core").document.tracks.size(), d.tracks.size());
+  core::doc::writeAutosave(dir, "core-audit-1", 4242, d, "", 1);  // antes: a mesma recusa, mais alto
+  CHECK(fs::exists(core::doc::autosavePath(dir, "core-audit-1")));
 }
 
 CORE_TEST_MAIN

@@ -170,4 +170,43 @@ TEST("reset: o menu da chain oferece TODOS os efeitos (os proprios incluidos) e 
   CHECK(curvesGone);
 }
 
+// Auditoria 2026-11-17, item 4: duplicateSection empurrava as mudancas de tempo de depois da seccao mas nao
+// copiava as de dentro, por isso a seccao duplicada perdia o tempo (e o ramp) que o randomizador EIXO J escreve.
+TEST("duplicar uma seccao copia tambem as mudancas de tempo que ha dentro dela") {
+  Document d = newEmptyDocument();
+  const std::string a = addSection(d, "Build", 0, 4 * kBar);
+  addSection(d, "Drop", 4 * kBar, 4 * kBar);
+  setTempoMap(d, {{1 * kBar, 200, json::object(), false}, {3 * kBar, 160, json::object(), true}, {6 * kBar, 120, json::object(), false}});
+  const size_t before = d.tempoMap.size();
+  const std::string dup = duplicateSection(d, a);
+  CHECK_EQ(d.tempoMap.size(), before + 2);  // os dois pontos de dentro tem copia na seccao nova
+  const auto at = [&](int64_t tick) -> const TempoPoint* {
+    for (const auto& p : d.tempoMap) if (p.tick == tick) return &p;
+    return nullptr;
+  };
+  const TempoPoint* copy = at(5 * kBar);
+  CHECK(copy != nullptr);
+  if (copy) {
+    CHECK_NEAR(copy->bpm, 200, 1e-9);
+    CHECK(!copy->ramp);
+  }
+  const TempoPoint* glide = at(7 * kBar);
+  CHECK(glide != nullptr);
+  if (glide) {
+    CHECK_NEAR(glide->bpm, 160, 1e-9);
+    CHECK(glide->ramp);  // o ramp tambem
+  }
+  const TempoPoint* later = at(10 * kBar);  // o que ja ia para depois move-se uma seccao
+  CHECK(later != nullptr);
+  if (later) CHECK_NEAR(later->bpm, 120, 1e-9);
+  // O tempo que toca na seccao duplicada e o da seccao original, nao o ultimo de antes.
+  CHECK_NEAR(bpmAt(d, 5 * kBar), 200, 1e-9);   // antes: 160, o ponto de 3 compassos, que ficava a valer
+  CHECK_NEAR(bpmAt(d, 7 * kBar), 160, 1e-9);
+  CHECK(!dup.empty());
+  const Section* moved = nullptr;
+  for (const auto& s : d.sections) if (s.id == dup) moved = &s;
+  CHECK(moved != nullptr);
+  if (moved) CHECK_EQ(moved->startTick, 4 * kBar);
+}
+
 CORE_TEST_MAIN
