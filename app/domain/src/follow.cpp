@@ -189,7 +189,7 @@ struct Score {
     const std::string name = old ? old->name : std::string();
     const std::string pid = addPattern(t, std::max<int64_t>(length, kPpq / 8));
     Pattern& np = patternById(t, pid);
-    if (!name.empty()) np.name = (name + "f").substr(0, 40);
+    if (!name.empty()) np.name = nameWithSuffix(name, "f", kMaxPatternNameBytes);
     np.notes = std::move(v);
     return pid;
   }

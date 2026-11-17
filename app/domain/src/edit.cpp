@@ -12,12 +12,6 @@
 namespace core::doc {
 
 namespace {
-// Cut a UTF-8 string to at most max bytes without splitting a character.
-std::string cutUtf8(const std::string& s, size_t max) {
-  if (s.size() <= max) return s;
-  while (max > 0 && ((unsigned char)s[max] & 0xC0) == 0x80) --max;
-  return s.substr(0, max);
-}
 // W-Core knobs every layer takes from Wave 1 (engine WaveStack::sync).
 constexpr const char* kWaveSharedKnobs[] = {"mode", "glide", "driftHz", "bend", "modWheel", "polyVoices", "legato", "glideAlways"};
 
@@ -340,7 +334,7 @@ std::string duplicateTrack(Document& doc, const std::string& trackId) {
   if (it == doc.tracks.end()) throw DocumentError("tracks", "no track '" + trackId + "'");
   Track copy = *it;  // notes keep their ids: they are unique within their own pattern
   copy.id = uniqueTrackId(doc, trackId);
-  copy.name = (it->name + " 2").substr(0, 80);
+  copy.name = nameWithSuffix(it->name, " 2", kMaxTrackNameBytes);
   copy.mix.solo = false;
   const auto at = it - doc.tracks.begin() + 1;  // right after the original
   doc.tracks.insert(doc.tracks.begin() + at, std::move(copy));
@@ -545,7 +539,7 @@ std::string makeClipUnique(Track& track, const std::string& clipId) {
   if (track.patterns.size() >= 64) throw DocumentError("patterns", "the track has the maximum of 64 patterns");
   Pattern copy = shared;  // note ids stay: they are unique within each pattern
   copy.id = nextId(track.patterns, "p");
-  copy.name = (shared.name + "b").substr(0, 40);
+  copy.name = nameWithSuffix(shared.name, "b", kMaxPatternNameBytes);
   track.patterns.push_back(copy);
   clipById(track, clipId).patternId = copy.id;  // the reference above may have moved
   return copy.id;
@@ -709,9 +703,7 @@ std::string addSection(Document& doc, const std::string& name, int64_t startTick
   for (const auto& s : doc.sections)
     if (startTick < s.startTick + s.lengthTicks && s.startTick < startTick + lengthTicks)
       throw DocumentError("sections", "overlaps the section '" + s.name + "'");
-  size_t cut = std::min<size_t>(name.size(), 40);  // on a character boundary (sweep D6: a cut "ç" is not UTF-8)
-  if (cut < name.size()) while (cut > 0 && ((unsigned char)name[cut] & 0xC0) == 0x80) --cut;
-  Section s{nextId(doc.sections, "s"), name.substr(0, cut), startTick, lengthTicks, json::object()};
+  Section s{nextId(doc.sections, "s"), cutUtf8(name, kMaxSectionNameBytes), startTick, lengthTicks, json::object()};  // never half a character (sweep D6)
   doc.sections.push_back(s);
   sortSections(doc);
   return s.id;
@@ -832,7 +824,7 @@ std::string duplicateSection(Document& doc, const std::string& sectionId) {
   std::sort(next.tempoMap.begin(), next.tempoMap.end(), [](const TempoPoint& a, const TempoPoint& b) { return a.tick < b.tick; });
   if (next.loop.startTick >= end) { next.loop.startTick += len; next.loop.endTick += len; }
   next.lengthTicks += len;
-  Section copy{nextId(next.sections, "s"), (original.name + " 2").substr(0, 40), end, len, json::object(), original.color};
+  Section copy{nextId(next.sections, "s"), nameWithSuffix(original.name, " 2", kMaxSectionNameBytes), end, len, json::object(), original.color};
   next.sections.push_back(copy);
   sortSections(next);
   doc = std::move(next);

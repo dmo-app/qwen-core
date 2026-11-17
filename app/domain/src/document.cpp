@@ -231,7 +231,7 @@ Track parseTrack(const json& v, const std::string& path, const std::set<std::str
   Track t;
   t.id = r.string("id", "", 40);
   if (!validId(t.id)) throw DocumentError(r.at("id"), "must be 1-40 letters, digits, '_' or '-'");
-  t.name = r.string("name", t.id, 80);
+  t.name = r.string("name", t.id, kMaxTrackNameBytes);
   t.color = r.string("color", "", 7);
   static const std::regex color("^#[0-9A-Fa-f]{6}$");
   if (!t.color.empty() && !std::regex_match(t.color, color)) throw DocumentError(r.at("color"), "must look like #rrggbb");
@@ -326,7 +326,7 @@ Track parseTrack(const json& v, const std::string& path, const std::set<std::str
     p.id = pr.string("id", "", 40);
     if (!validId(p.id)) throw DocumentError(pr.at("id"), "must be 1-40 letters, digits, '_' or '-'");
     if (t.findPattern(p.id)) throw DocumentError(pr.at("id"), "is used twice in this track");
-    p.name = pr.string("name", p.id, 40);
+    p.name = pr.string("name", p.id, kMaxPatternNameBytes);
     p.lengthTicks = pr.integer("lengthTicks", 4 * kPpq, kPpq / 8, kMaxPatternTicks);
     const json notes = pr.array("notes", kMaxNotes);
     std::set<std::string> noteIds;
@@ -639,7 +639,7 @@ Document parseDocument(const json& input, int* migratedFrom) {
     s.id = sr.string("id", "", 40);
     if (!validId(s.id)) throw DocumentError(sr.at("id"), "must be 1-40 letters, digits, '_' or '-'");
     if (!sectionIds.insert(s.id).second) throw DocumentError(sr.at("id"), "is used twice");
-    s.name = sr.string("name", s.id, 40);
+    s.name = sr.string("name", s.id, kMaxSectionNameBytes);
     s.startTick = sr.integer("startTick", 0, 0, kMaxSongTicks - 1);
     s.lengthTicks = sr.integer("lengthTicks", 8 * 4 * kPpq, 1, kMaxSongTicks);
     s.color = sr.string("color", "", 7);
@@ -1054,6 +1054,22 @@ std::string currentSectionSwatch(const std::string& color) {
   for (const auto& [from, to] : old)
     if (c == from) return to;
   return color;
+}
+
+std::string cutUtf8(const std::string& s, size_t max) {
+  if (s.size() <= max) return s;
+  while (max > 0 && ((unsigned char)s[max] & 0xC0) == 0x80) --max;
+  return s.substr(0, max);
+}
+
+std::string nameWithSuffix(const std::string& head, const std::string& suffix, size_t max) {
+  if (head.size() + suffix.size() <= max) return head + suffix;
+  if (suffix.size() >= max) {  // the suffix is the name on its own: keep its tail, whole
+    std::string tail = suffix.substr(suffix.size() - max);
+    while (!tail.empty() && ((unsigned char)tail[0] & 0xC0) == 0x80) tail.erase(0, 1);
+    return tail;
+  }
+  return cutUtf8(head, max - suffix.size()) + suffix;
 }
 
 } // namespace core::doc

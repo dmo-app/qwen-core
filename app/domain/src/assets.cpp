@@ -205,11 +205,6 @@ void place(const fs::path& file, const fs::path& target, const std::string& hash
   if (e) throw DocumentError("file", "could not be copied into the project folder: " + e.message());
 }
 
-std::string cutUtf8(const std::string& s, size_t max) {
-  if (s.size() <= max) return s;
-  while (max > 0 && ((unsigned char)s[max] & 0xC0) == 0x80) --max;
-  return s.substr(0, max);
-}
 }  // namespace
 
 std::string importAudio(Document& doc, const fs::path& file, const fs::path& projectDir) {

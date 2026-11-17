@@ -233,27 +233,10 @@ std::string mainPatternIn(const Track& t, int64_t a, int64_t b) {
 // had just accepted (audit 2026-11-17, #1: "Groove second roll (triplet)" is 59 bytes). The cut never splits
 // a UTF-8 character (the same rule as cutUtf8 in edit.cpp), and the suffix stays whole: it is what tells the
 // patterns of one section apart, and isFill() reads the word "fill" out of it.
-constexpr size_t kMaxPatternNameBytes = 40;
-
-std::string cutUtf8(const std::string& s, size_t max) {
-  if (s.size() <= max) return s;
-  while (max > 0 && ((unsigned char)s[max] & 0xC0) == 0x80) --max;
-  return s.substr(0, max);
-}
-
-std::string patternName(const std::string& head, const std::string& suffix) {
-  if (suffix.size() >= kMaxPatternNameBytes) {  // a suffix that is the name on its own keeps its tail
-    std::string tail = suffix.substr(suffix.size() - kMaxPatternNameBytes);
-    while (!tail.empty() && ((unsigned char)tail[0] & 0xC0) == 0x80) tail.erase(0, 1);
-    return tail;
-  }
-  return cutUtf8(head, kMaxPatternNameBytes - suffix.size()) + suffix;
-}
-
 std::string newPattern(Track& t, const std::string& head, const std::string& suffix, int64_t length, std::vector<Note> notes) {
   const std::string id = addPattern(t, length);
   Pattern& p = patternById(t, id);
-  p.name = patternName(head, suffix);
+  p.name = nameWithSuffix(head, suffix, kMaxPatternNameBytes);
   std::sort(notes.begin(), notes.end(), [](const Note& x, const Note& y) { return x.tick != y.tick ? x.tick < y.tick : x.pitch < y.pitch; });
   for (size_t i = 0; i < notes.size(); ++i) notes[i].id = "n" + std::to_string(i + 1);
   p.notes = std::move(notes);

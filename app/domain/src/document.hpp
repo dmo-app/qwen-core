@@ -290,4 +290,18 @@ struct ImportReport {
 // v1 (JS editor) files are not opened here yet: their audio tracks need the asset support of M3.
 Document importProjectV2(const json& project, ImportReport* report = nullptr);
 
+// ---- names, the way the reader takes them
+// parseDocument refuses a pattern or a section name over 40 bytes and a track name over 80 (an accented letter
+// counts as 2), so a name Core writes for itself has to fit before the song is saved - and a cut that lands
+// inside a character is not UTF-8 at all, which fails the save as well (audit 2026-11-17, #1).
+inline constexpr size_t kMaxPatternNameBytes = 40;
+inline constexpr size_t kMaxSectionNameBytes = 40;
+inline constexpr size_t kMaxTrackNameBytes = 80;
+
+// `s` cut to at most max bytes, never inside a UTF-8 character.
+std::string cutUtf8(const std::string& s, size_t max);
+// head + suffix inside max bytes. The suffix is what tells the two apart (" 2", " copy", "b"), so when there is
+// no room the head loses bytes, never the suffix. A suffix that is the name on its own keeps its own tail.
+std::string nameWithSuffix(const std::string& head, const std::string& suffix, size_t max);
+
 } // namespace core::doc

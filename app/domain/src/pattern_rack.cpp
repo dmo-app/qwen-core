@@ -181,7 +181,7 @@ Pattern& rackPatternFor(Document& doc, const std::string& slotId, const std::str
   const auto it = slot.tracks.find(trackId);
   if (it == slot.tracks.end() || !t->findPattern(it->second)) {
     const std::string pid = addPattern(*t, slot.bars * kBar);
-    patternById(*t, pid).name = slot.name;
+    patternById(*t, pid).name = cutUtf8(slot.name, kMaxPatternNameBytes);  // a song from before 2026-11-17 can hold a longer one
     slot.tracks[trackId] = pid;
   }
   setRackSlots(doc, slots);
@@ -271,7 +271,7 @@ std::string addRackSlot(Document& doc, const std::string& name, int bars) {
   auto slots = rackSlots(doc);
   PatternSlot s;
   s.id = nextSlotId(slots);
-  s.name = name.empty() ? "Pattern " + std::to_string(slots.size() + 1) : name;
+  s.name = cutUtf8(name.empty() ? "Pattern " + std::to_string(slots.size() + 1) : name, kMaxPatternNameBytes);
   s.bars = validBars(bars);
   slots.push_back(s);
   setRackSlots(doc, slots);
@@ -283,7 +283,7 @@ std::string duplicateRackSlot(Document& doc, const std::string& slotId) {
   const PatternSlot from = slotById(slots, slotId);
   PatternSlot copy = from;
   copy.id = nextSlotId(slots);
-  copy.name = from.name + " copy";
+  copy.name = nameWithSuffix(from.name, " copy", kMaxPatternNameBytes);
   copy.tracks.clear();
   for (const auto& [trackId, pid] : from.tracks) {
     Track* t = trackPtr(doc, trackId);
@@ -304,7 +304,7 @@ std::string duplicateRackSlot(Document& doc, const std::string& slotId) {
 void renameRackSlot(Document& doc, const std::string& slotId, const std::string& name) {
   if (name.empty()) throw DocumentError("name", "a pattern needs a name");
   auto slots = rackSlots(doc);
-  slotById(slots, slotId).name = name;
+  slotById(slots, slotId).name = cutUtf8(name, kMaxPatternNameBytes);
   setRackSlots(doc, slots);
 }
 
