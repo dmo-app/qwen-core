@@ -28,6 +28,13 @@ inline ClipGrains clipGrains(double pitchSemitones, double freezeSeconds, double
     g.ratio = std::pow(2.0, std::clamp(pitchSemitones, -24.0, 24.0) / 12.0);
     if (!g.grain) g.grain = (int64_t)std::llround(0.030 * sampleRate);
   }
+  // A frozen piece shorter than one grain's read cannot be held by a grain that long, so the grain
+  // shrinks to fit it: freezeSeconds says how much of the file is held, and that is what is played
+  // (audit 2026-11-17 item 11: with a 10 ms freeze and 40 ms grains the scan left the piece).
+  if (g.freezeSpan > 0 && g.grain > 0 && g.ratio > 0) {
+    const int64_t longest = (int64_t)((double)(g.freezeSpan - 1) / g.ratio);
+    if (longest < g.grain) g.grain = std::max<int64_t>(1, longest);
+  }
   return g;
 }
 
@@ -35,6 +42,9 @@ inline ClipGrains clipGrains(double pitchSemitones, double freezeSeconds, double
 inline void clipGrainFrame(const ClipGrains& c, int64_t offset, const float* srcL, const float* srcR, int64_t frames, int64_t inClip,
                            double& l, double& r) {
   const double G = (double)c.grain;
+  // How far into the file this clip may be read: to the end of the file, or, with a freeze, to the end
+  // of the held piece (including the sample the interpolation reaches for).
+  const int64_t limit = c.freezeSpan > 0 ? std::min<int64_t>(frames - 1, offset + c.freezeSpan - 1) : frames - 1;
   l = 0; r = 0;
   for (int j = 0; j < 2; ++j) {
     const double shifted = (double)inClip + j * G * 0.5;
@@ -48,9 +58,9 @@ inline void clipGrainFrame(const ClipGrains& c, int64_t offset, const float* src
       at = std::max(0.0, grainStart);
     }
     double src = (double)offset + at + phase * c.ratio;
-    src = std::clamp(src, 0.0, (double)(frames - 1));
+    src = std::clamp(src, 0.0, (double)limit);
     const int64_t i0 = (int64_t)src;
-    const int64_t i1 = std::min<int64_t>(i0 + 1, frames - 1);
+    const int64_t i1 = std::min<int64_t>(i0 + 1, limit);
     const double f = src - (double)i0;
     const double w = std::sin(3.14159265358979323846 * phase / G);
     const double win = w * w;

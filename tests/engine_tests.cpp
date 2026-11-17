@@ -460,19 +460,21 @@ TEST("engine.start: uma saída que falha não deixa a app sem som (audit 14)") {
   host.failNext = true;  // a próxima saída recusa-se a abrir
   CHECK_THROWS(server.execute("engine.start", json::object()));
   CHECK_EQ(host.logs.size(), (size_t)2);
-  CHECK(host.logs[0]->running);  // hoje: parado e destruido antes da tentativa → silencio
-  CHECK_EQ(host.logs[0]->starts, 2);
+  CHECK(host.logs[0]->running);  // hoje: parado e destruído antes da tentativa → silêncio
+  CHECK_EQ(host.logs[0]->starts, 2);  // a anterior volta a abrir-se
   CHECK_EQ(host.logs[0]->stops, 1);
   host.nullNext = true;          // e quando não há saída nenhuma
   CHECK_THROWS(server.execute("engine.start", json::object()));
   CHECK(host.logs[0]->running);
+  CHECK_EQ(host.logs.size(), (size_t)2);   // sem saída não há um segundo objecto
   // Uma tentativa que resulta volta a ser aceite, com a saída nova em curso.
   const auto ok = server.execute("engine.start", json::object());
   CHECK(ok.is_object());
-  CHECK_EQ(host.logs.size(), (size_t)3);   // uma saida de reserva nao e criada quando nao ha saida
+  CHECK_EQ(host.logs.size(), (size_t)3);   // cada tentativa parada abre um dispositivo novo
   CHECK(host.logs[2]->running);
   CHECK(!host.logs[0]->running);           // esta largada quando a nova responde
-  CHECK_EQ(host.logs[0]->starts, 2);
+  CHECK_EQ(host.logs[0]->starts, 3);       // reaberta em cada uma das duas recusas
+  CHECK_EQ(host.logs[0]->stops, 3);
 }
 
 CORE_TEST_MAIN

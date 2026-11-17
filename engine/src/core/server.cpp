@@ -324,35 +324,69 @@ json Server::execute(const std::string& cmd, const json& args) {
     // M5: tracks on several cores while playing. {liveThreads: n} or CORE_LIVE_THREADS; default 4 (0 = serial).
     const int live = (int)std::clamp(numArg(args, "liveThreads", (double)liveThreadsFromEnv()), 0.0, 32.0);
     if (args.contains("listenDb") && !args["listenDb"].is_number()) throw std::runtime_error("listenDb must be a number (dB).");
-    if (output_) { output_->stop(); output_.reset(); }
-    if (args.contains("listenDb"))
-      listenDb_ = std::clamp(args["listenDb"].get<double>(), OutputGuard::kListenMinDb, OutputGuard::kListenMaxDb);
-    if (sr != sampleRate_ || !engine_ || live != engine_->liveThreads()) {
-      sampleRate_ = sr;
-      engine_ = std::make_unique<Engine>(sampleRate_, live);
-      engine_->setEarGuard(true);
+    // The device that is playing is put aside, not thrown away: if the new one does not come up the old
+    // one goes back on the engine it was playing, and the song keeps sounding (audit 2026-11-17 item 14:
+    // it was stopped and destroyed before the try, so a refused start — a device busy, no device at all,
+    // the second start of a rate change — left the app with no output until the user asked again).
+    std::unique_ptr<AudioOutput> kept = std::move(output_);
+    json keptInfo = std::move(outputInfo_);
+    const json keptArgs = outputArgs_;
+    const double keptRate = sampleRate_;
+    const bool otherEngine = sr != sampleRate_ || !engine_ || live != engine_->liveThreads();
+    std::unique_ptr<Engine> keptEngine;  // set only when this start replaces it
+    if (kept) kept->stop();
+    if (otherEngine) keptEngine = std::move(engine_);
+    try {
+      if (args.contains("listenDb"))
+        listenDb_ = std::clamp(args["listenDb"].get<double>(), OutputGuard::kListenMinDb, OutputGuard::kListenMaxDb);
+      if (otherEngine) {
+        sampleRate_ = sr;
+        engine_ = std::make_unique<Engine>(sampleRate_, live);
+        engine_->setEarGuard(true);
+        engine_->setListenDb(listenDb_);
+        rebuild();
+      }
+      output_ = makeOutput_();
+      if (!output_) throw std::runtime_error("No audio output available.");
       engine_->setListenDb(listenDb_);
-      rebuild();
+      engine_->setEarGuard(true);  // a device: the guard is on, whatever an embedding code did to this engine
+      outputArgs_ = args;
+      outputInfo_ = output_->start(*engine_, args);
+      const double actual = outputInfo_.value("sampleRate", sampleRate_);
+      if (actual != sampleRate_) {  // the device chose another rate: rebuild for it
+        output_->stop();
+        sampleRate_ = actual;
+        engine_ = std::make_unique<Engine>(sampleRate_, live);
+        engine_->setEarGuard(true);
+        engine_->setListenDb(listenDb_);
+        rebuild();
+        json again = args; again["sampleRate"] = actual;
+        outputArgs_ = again;
+        outputInfo_ = output_->start(*engine_, again);
+      }
+      keptEngine.reset();  // the new device answered: the engine it replaced no longer plays
+      json started = outputInfo_;
+      started["latency"] = latencyJson();  // the device's latencyMs, plus what the song's graph adds
+      return started;
+    } catch (...) {
+      output_.reset();  // the one that did not come up
+      sampleRate_ = keptRate;
+      if (keptEngine) engine_ = std::move(keptEngine);  // its own engine, with the transport where it was
+      if (kept) {
+        output_ = std::move(kept);
+        try {
+          outputInfo_ = output_->start(*engine_, keptArgs);  // as it was started before this command
+          outputArgs_ = keptArgs;                            // and the next failed try puts it back the same way
+        } catch (...) {  // the device is gone as well: nothing to put back, but the command still says why
+          output_->stop();
+          output_.reset();
+          outputInfo_ = json();
+        }
+      } else {
+        outputInfo_ = std::move(keptInfo);
+      }
+      throw;
     }
-    output_ = makeOutput_();
-    if (!output_) throw std::runtime_error("No audio output available.");
-    engine_->setListenDb(listenDb_);
-    engine_->setEarGuard(true);  // a device: the guard is on, whatever an embedding code did to this engine
-    outputInfo_ = output_->start(*engine_, args);
-    const double actual = outputInfo_.value("sampleRate", sampleRate_);
-    if (actual != sampleRate_) {  // the device chose another rate: rebuild for it
-      output_->stop();
-      sampleRate_ = actual;
-      engine_ = std::make_unique<Engine>(sampleRate_, live);
-      engine_->setEarGuard(true);
-      engine_->setListenDb(listenDb_);
-      rebuild();
-      json again = args; again["sampleRate"] = actual;
-      outputInfo_ = output_->start(*engine_, again);
-    }
-    json started = outputInfo_;
-    started["latency"] = latencyJson();  // the device's latencyMs, plus what the song's graph adds
-    return started;
   }
   if (cmd == "listen.set") {
     if (!args.contains("db") || !args["db"].is_number()) throw std::runtime_error("listen.set needs {db: -60..0}.");

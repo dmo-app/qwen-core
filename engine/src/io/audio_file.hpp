@@ -20,6 +20,16 @@ struct AudioData {
 // UTF-8. Throws std::runtime_error with a readable message. maxFrames guards memory.
 AudioData readWav(const std::string& path, int64_t maxFrames);
 
+// Only what the header says, with no audio read: what a caller needs to know before it decides how
+// much memory a file would take (the frames the file holds, its own rate and channel count). False with
+// *error set when the file cannot be opened or is not a readable WAV (the same message readWav gives).
+struct WavInfo {
+  int64_t frames = 0;
+  double sampleRate = 0;
+  int channels = 0;
+};
+bool wavInfo(const std::string& path, WavInfo* info, std::string* error);
+
 // Band-limited conversion (windowed sinc, 64 taps, cut-off lowered when converting down).
 // Same rate: a copy.
 AudioData resample(const AudioData& in, double targetRate);

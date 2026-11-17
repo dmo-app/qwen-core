@@ -192,8 +192,16 @@ public:
     count_ = 0;
   }
   void adopt(const Instrument& previous) override {
-    // The same plugin instance plays on; only the notes it still holds are known here.
-    if (auto* p = dynamic_cast<const PluginInstrument*>(&previous)) std::copy(p->held_, p->held_ + 128, held_);
+    // The same plugin instance plays on: the pitches it holds and the note-offs that did not fit in the
+    // last block's queue (audit 2026-11-17 item 13: only held_ came over, and what was waiting in the
+    // reserve was never sent — a pitch started twice in a dense block stayed sounding in the plugin
+    // until Stop or a seek silenced it).
+    if (auto* p = dynamic_cast<const PluginInstrument*>(&previous)) {
+      std::copy(p->held_, p->held_ + 128, held_);
+      std::copy(p->pendingOffs_, p->pendingOffs_ + 128, pendingOffs_);
+      std::copy(p->pendingAt_, p->pendingAt_ + 128, pendingAt_);
+      panic_ = p->panic_;
+    }
   }
   // At most kCapacity events reach the plugin per block: the JUCE host prepares its MIDI buffer for
   // kMaxPluginEvents (plugins.hpp), so it never allocates on the audio thread.
@@ -811,7 +819,15 @@ void Graph::adopt(Graph& previous) {
         t.fromL = o.fromL; t.fromR = o.fromR; t.toL = o.toL; t.toR = o.toR; t.rampBlock = o.rampBlock; t.gainInit = o.gainInit;
         t.postFromL = o.postFromL; t.postFromR = o.postFromR; t.postToL = o.postToL; t.postToR = o.postToR;
         std::copy(o.smooth, o.smooth + kMaxParams, t.smooth); t.smoothInit = o.smoothInit; t.paramBlock = o.paramBlock;
-        t.lastOnSample = o.lastOnSample; t.envAge = o.envAge; t.envTicks = o.envTicks; t.envBlock = o.envBlock;
+        // M8b: the note the envelopes count from is a musical moment, not a number of samples. The
+        // engine puts the play head on the same tick when the tempo changes (Engine::publish), so the
+        // note-on comes over through the tick that both tempo maps agree on (audit 2026-11-17 item 12:
+        // copied as a sample, a rise read a beat and a half instead of half a beat, and the other way
+        // round landed in front of the play head, which rests the envelope and silences the note).
+        t.lastOnSample = o.lastOnSample == INT64_MIN
+                             ? INT64_MIN
+                             : (int64_t)std::llround(tempo_.sampleAt(previous.tempo_.tickAt((double)o.lastOnSample)));
+        t.envAge = o.envAge; t.envTicks = o.envTicks; t.envBlock = -1;  // worked out again from the note above
         if (keepTails && t.delayL.size() == o.delayL.size()) {  // the same delay: what is on its way still comes out (no gap)
           std::copy(o.delayL.begin(), o.delayL.end(), t.delayL.begin());
           std::copy(o.delayR.begin(), o.delayR.end(), t.delayR.begin());

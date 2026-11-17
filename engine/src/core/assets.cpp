@@ -1,4 +1,5 @@
 #include "assets.hpp"
+#include <cmath>
 #include <filesystem>
 #include <stdexcept>
 
@@ -18,8 +19,23 @@ std::shared_ptr<const AudioData> AssetStore::get(const std::string& path, double
     for (const auto& [k, data] : files_) used += data->bytes();
     // Frames that fit in what is left, at the source rate (a rough bound before the conversion).
     const int64_t room = (int64_t)((maxBytes_ > used ? maxBytes_ - used : 0) / (2 * sizeof(float)));
+    // The header is read first (audit 2026-11-17 item 10): what the file becomes at the song's rate is
+    // known before any audio is allocated, so a file that cannot fit is refused without being read and
+    // converted. Loading a long 8 kHz take into a 48 kHz song used to touch six times its own size
+    // before the limit was noticed and the clip left silent.
+    WavInfo info;
+    std::string why;
+    if (wavInfo(path, &info, &why) && info.frames > 0 && info.sampleRate > 0) {
+      // The same rounding resample uses, so the pre-check and the buffer it produces agree.
+      const double exact = (double)info.frames * sampleRate / info.sampleRate;
+      const int64_t atSongRate = (int64_t)std::ceil(exact - exact * 1e-12);
+      if (info.frames > room || atSongRate > room) throw std::runtime_error(path + ": not enough memory for more audio (limit " + std::to_string(maxBytes_ >> 20) + " MB).");
+    }
     AudioData source = readWav(path, room);
-    auto data = std::make_shared<const AudioData>(resample(source, sampleRate));
+    // At the song's own rate there is nothing to convert: the file is used as it came in, instead of
+    // being copied once more through the whole of its size (the same audit item).
+    AudioData converted = source.sampleRate == sampleRate ? std::move(source) : resample(source, sampleRate);
+    auto data = std::make_shared<const AudioData>(std::move(converted));
     if (used + data->bytes() > maxBytes_) throw std::runtime_error(path + ": not enough memory for more audio (limit " + std::to_string(maxBytes_ >> 20) + " MB).");
     files_[key] = data;
     return data;

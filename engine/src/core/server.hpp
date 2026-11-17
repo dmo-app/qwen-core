@@ -119,6 +119,7 @@ private:
   std::unique_ptr<Engine> engine_;
   std::unique_ptr<AudioOutput> output_;
   json outputInfo_;
+  json outputArgs_ = json::object();  // what the running device was started with: an engine.start that fails puts it back
   Project project_;
   TempoMap tempo_;
   int trackLatency_ = 0, masterLatency_ = 0;  // of the last graph built (samples)

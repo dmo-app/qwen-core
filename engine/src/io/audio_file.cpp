@@ -35,16 +35,24 @@ bool chunkFollows(std::istream& in) {
   return (int64_t)u32(h + 4) <= (int64_t)(end - here) - 8;
 }
 
-}  // namespace
 
-AudioData readWav(const std::string& path, int64_t maxFrames) {
-  std::ifstream in(utf8Path(path), std::ios::binary);
-  if (!in) throw std::runtime_error("Cannot open " + path + ".");
+// The chunks up to the audio data: the format and how many frames the file really holds. Nothing past
+// the headers is read and no audio-sized buffer is allocated, so a caller can decide before loading
+// (audit 2026-11-17 item 10: the memory limit used to be found out only after the file had been read
+// and converted). The stream is left at the first audio frame. Throws std::runtime_error with the same
+// messages readWav has always used.
+struct WavHeader {
+  int format = 0, channels = 0, bits = 0;
+  uint32_t rate = 0;
+  int64_t frames = 0;
+  std::streamoff dataAt = 0;
+};
+
+WavHeader parseWavHeader(std::istream& in, const std::string& path) {
   unsigned char riff[12];
   if (!in.read((char*)riff, 12) || std::memcmp(riff, "RIFF", 4) || std::memcmp(riff + 8, "WAVE", 4))
     throw std::runtime_error(path + " is not a WAV file.");
-  int format = 0, channels = 0, bits = 0;
-  uint32_t rate = 0;
+  WavHeader h;
   bool haveFormat = false;
   for (;;) {
     unsigned char head[8];
@@ -62,75 +70,104 @@ AudioData readWav(const std::string& path, int64_t maxFrames) {
       const uint32_t used = std::min<uint32_t>(size, sizeof fmt);
       if (!in.read((char*)fmt, used)) throw std::runtime_error(path + ": broken format header.");
       in.ignore(size - used);
-      format = u16(&fmt[0]);
-      channels = u16(&fmt[2]);
-      rate = u32(&fmt[4]);
-      bits = u16(&fmt[14]);
-      if (format == 0xFFFE && size >= 26) format = u16(&fmt[24]);  // WAVE_FORMAT_EXTENSIBLE: the sub-format
+      h.format = u16(&fmt[0]);
+      h.channels = u16(&fmt[2]);
+      h.rate = u32(&fmt[4]);
+      h.bits = u16(&fmt[14]);
+      if (h.format == 0xFFFE && size >= 26) h.format = u16(&fmt[24]);  // WAVE_FORMAT_EXTENSIBLE: the sub-format
       haveFormat = true;
       if (size & 1) in.ignore(1);
       continue;
     }
     if (!std::memcmp(head, "data", 4)) {
       if (!haveFormat) throw std::runtime_error(path + ": audio data before its format.");
-      if (format != 1 && format != 3) throw std::runtime_error(path + ": only PCM or float WAV files are supported.");
-      if (channels != 1 && channels != 2) throw std::runtime_error(path + ": only mono or stereo files are supported (" + std::to_string(channels) + " channels).");
-      if (!(rate >= 8000 && rate <= 384000)) throw std::runtime_error(path + ": unsupported sample rate " + std::to_string(rate) + ".");
-      const bool ok = (format == 1 && (bits == 16 || bits == 24 || bits == 32)) || (format == 3 && (bits == 32 || bits == 64));
-      if (!ok) throw std::runtime_error(path + ": unsupported sample format (" + std::to_string(bits) + "-bit).");
-      const int bytes = bits / 8, frameBytes = bytes * channels;
-      int64_t frames = size / frameBytes;
+      if (h.format != 1 && h.format != 3) throw std::runtime_error(path + ": only PCM or float WAV files are supported.");
+      if (h.channels != 1 && h.channels != 2) throw std::runtime_error(path + ": only mono or stereo files are supported (" + std::to_string(h.channels) + " channels).");
+      if (!(h.rate >= 8000 && h.rate <= 384000)) throw std::runtime_error(path + ": unsupported sample rate " + std::to_string(h.rate) + ".");
+      const bool ok = (h.format == 1 && (h.bits == 16 || h.bits == 24 || h.bits == 32)) || (h.format == 3 && (h.bits == 32 || h.bits == 64));
+      if (!ok) throw std::runtime_error(path + ": unsupported sample format (" + std::to_string(h.bits) + "-bit).");
+      const int frameBytes = (h.bits / 8) * h.channels;
+      h.frames = size / frameBytes;
       // Streaming writers: the data runs to the end of the file. Only when its length is really unknown: 0xFFFFFFFF,
       // or 0 with no chunk after it. A legal empty "data" followed by another chunk (LIST...) is 0 frames, not the
       // metadata read as audio (audit 2026-11-08 part 21, B2: 5 frames of noise, peak 0.79).
       if (size == 0xFFFFFFFFu || (size == 0 && !chunkFollows(in))) {
         const auto here = in.tellg();
         in.seekg(0, std::ios::end);
-        frames = (int64_t)(in.tellg() - here) / frameBytes;
+        h.frames = (int64_t)(in.tellg() - here) / frameBytes;
         in.seekg(here);
       }
       {  // never more frames than the file holds: a size that says more does not decide the allocation
         const auto here = in.tellg();
         in.seekg(0, std::ios::end);
-        frames = std::min<int64_t>(frames, (int64_t)(in.tellg() - here) / frameBytes);
+        h.frames = std::min<int64_t>(h.frames, (int64_t)(in.tellg() - here) / frameBytes);
         in.seekg(here);
       }
-      if (frames > maxFrames) throw std::runtime_error(path + " is too long to load (" + std::to_string(frames) + " frames).");
-      AudioData out;
-      out.sampleRate = rate;
-      out.channels = channels;
-      out.L.resize((size_t)frames);
-      if (channels == 2) out.R.resize((size_t)frames);
-      std::vector<unsigned char> buf((size_t)frameBytes * 65536);
-      for (int64_t at = 0; at < frames;) {
-        const int64_t n = std::min<int64_t>(65536, frames - at);
-        // A file cut short: the whole frames that were read are kept, then it stops (audit of main fa3b428, F07:
-        // they were left as silence).
-        const bool cut = !in.read((char*)buf.data(), n * frameBytes);
-        const int64_t got = cut ? (int64_t)in.gcount() / frameBytes : n;
-        for (int64_t i = 0; i < got; ++i)
-          for (int c = 0; c < channels; ++c) {
-            const unsigned char* p = &buf[(size_t)(i * frameBytes + c * bytes)];
-            float v;
-            if (format == 3 && bits == 32) std::memcpy(&v, p, 4);
-            else if (format == 3) { double d; std::memcpy(&d, p, 8); v = (float)d; }
-            else if (bits == 16) v = (int16_t)u16(p) / 32768.0f;
-            else if (bits == 24) v = (int32_t)((p[0] << 8) | (p[1] << 16) | ((uint32_t)p[2] << 24)) / 2147483648.0f;
-            else v = (int32_t)u32(p) / 2147483648.0f;
-            (c == 0 ? out.L : out.R)[(size_t)(at + i)] = v;
-          }
-        at += got;
-        if (cut) {
-          frames = at;
-          out.L.resize((size_t)frames);
-          if (channels == 2) out.R.resize((size_t)frames);
-          break;
-        }
-      }
-      if (channels == 1) out.R = out.L;
-      return out;
+      h.dataAt = in.tellg();
+      return h;
     }
     in.ignore((std::streamsize)size + (std::streamsize)(size & 1));  // another chunk (LIST, bext...); 64-bit: 0xFFFFFFFF + 1 is not 0 (sweep)
+  }
+}
+
+}  // namespace
+
+AudioData readWav(const std::string& path, int64_t maxFrames) {
+  std::ifstream in(utf8Path(path), std::ios::binary);
+  if (!in) throw std::runtime_error("Cannot open " + path + ".");
+  const WavHeader h = parseWavHeader(in, path);
+  if (h.frames > maxFrames) throw std::runtime_error(path + " is too long to load (" + std::to_string(h.frames) + " frames).");
+  in.seekg(h.dataAt);
+  const int bytes = h.bits / 8, frameBytes = bytes * h.channels;
+  int64_t frames = h.frames;
+  AudioData out;
+  out.sampleRate = h.rate;
+  out.channels = h.channels;
+  out.L.resize((size_t)frames);
+  if (h.channels == 2) out.R.resize((size_t)frames);
+  std::vector<unsigned char> buf((size_t)frameBytes * 65536);
+  for (int64_t at = 0; at < frames;) {
+    const int64_t n = std::min<int64_t>(65536, frames - at);
+    // A file cut short: the whole frames that were read are kept, then it stops (audit of main fa3b428, F07:
+    // they were left as silence).
+    const bool cut = !in.read((char*)buf.data(), n * frameBytes);
+    const int64_t got = cut ? (int64_t)in.gcount() / frameBytes : n;
+    for (int64_t i = 0; i < got; ++i)
+      for (int c = 0; c < h.channels; ++c) {
+        const unsigned char* p = &buf[(size_t)(i * frameBytes + c * bytes)];
+        float v;
+        if (h.format == 3 && h.bits == 32) std::memcpy(&v, p, 4);
+        else if (h.format == 3) { double d; std::memcpy(&d, p, 8); v = (float)d; }
+        else if (h.bits == 16) v = (int16_t)u16(p) / 32768.0f;
+        else if (h.bits == 24) v = (int32_t)((p[0] << 8) | (p[1] << 16) | ((uint32_t)p[2] << 24)) / 2147483648.0f;
+        else v = (int32_t)u32(p) / 2147483648.0f;
+        (c == 0 ? out.L : out.R)[(size_t)(at + i)] = v;
+      }
+    at += got;
+    if (cut) {
+      frames = at;
+      out.L.resize((size_t)frames);
+      if (h.channels == 2) out.R.resize((size_t)frames);
+      break;
+    }
+  }
+  if (h.channels == 1) out.R = out.L;
+  return out;
+}
+
+bool wavInfo(const std::string& path, WavInfo* info, std::string* error) {
+  try {
+    std::ifstream in(utf8Path(path), std::ios::binary);
+    if (!in) {
+      if (error) *error = "Cannot open " + path + ".";
+      return false;
+    }
+    const WavHeader h = parseWavHeader(in, path);
+    if (info) { info->frames = h.frames; info->sampleRate = h.rate; info->channels = h.channels; }
+    return true;
+  } catch (const std::exception& e) {
+    if (error) *error = e.what();
+    return false;
   }
 }
 
