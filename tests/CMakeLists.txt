@@ -70,6 +70,12 @@ target_link_libraries(round3_tests PRIVATE core_domain core_engine_lib)
 target_compile_definitions(round3_tests PRIVATE CORE_LANG_DIR="${CMAKE_SOURCE_DIR}/lang")
 add_test(NAME round3_tests COMMAND round3_tests)
 
+# O control: as propostas de chamadas do AICORE vistas pelo Core (o "on" e a "section" na canção, o que é recusado).
+add_executable(calls_tests calls_tests.cpp)
+target_include_directories(calls_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(calls_tests PRIVATE core_control core_domain)
+add_test(NAME calls_tests COMMAND calls_tests)
+
 # The command line: what the app and the scripts call.
 add_test(NAME cli_version COMMAND core-engine --version)
 set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "core-engine ${CORE_VERSION}")
@@ -81,7 +87,7 @@ add_test(NAME cli_measure COMMAND ${CMAKE_COMMAND} -DENGINE=$<TARGET_FILE:core-e
 add_test(NAME cli_unicode COMMAND ${CMAKE_COMMAND} -DENGINE=$<TARGET_FILE:core-engine> -DWORK=${CMAKE_CURRENT_BINARY_DIR}/cli
                                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_unicode.cmake)
 
-set_tests_properties(engine_tests domain_tests role_tests midi_tests bug_tests audit_tests audit2_tests hunt_tests round3_tests bitwig_tests cli_version cli_demo_render cli_measure cli_unicode
+set_tests_properties(engine_tests domain_tests role_tests midi_tests bug_tests audit_tests audit2_tests hunt_tests round3_tests calls_tests bitwig_tests cli_version cli_demo_render cli_measure cli_unicode
                      PROPERTIES LABELS merge TIMEOUT 300)
 
 # The app's own end-to-end test (play, undo, save/reopen, export... on the null device, with its test plugins).
